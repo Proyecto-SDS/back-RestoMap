@@ -1,0 +1,43 @@
+# Archivos de python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Entornos virtuales
+venv/
+.env/
+.venv/
+
+# Archivos de configuracion locales
+*.env
+alembic.ini
+
+# logs
+*.log
+logs/
+log/
+
+# carpetas extra
+build/
+dist/
+*.egg-info/
+
+# VSCode
+.vscode/
+
+# Cache en general
+*.cache/
+.cache/
+
+# Archivos temporales
+*.tmp
+*.temp
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Bases de datos locales
+*.db
