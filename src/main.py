@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from database import db_session
+import os
 
 def create_app():
     app = Flask(__name__)
@@ -32,10 +33,17 @@ def create_app():
     app.register_blueprint(opiniones_bp)
     app.register_blueprint(reservas_bp)
 
+
     return app
 
 app = create_app()
 
 if __name__ == "__main__":
+
+    port = int(os.environ.get("PORT", "5000"))
+
+    debug_mode = os.environ.get("FLASK_ENV") == "development"
+
+    print(f"Iniciando servidor en el puerto: {port}")
     # Ejecutar en modo debug si se corre directamente
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
