@@ -12,7 +12,6 @@ venv/
 
 # Archivos de configuracion locales
 *.env
-alembic.ini
 
 # logs
 *.log
@@ -23,9 +22,6 @@ log/
 build/
 dist/
 *.egg-info/
-
-# VSCode
-.vscode/
 
 # Cache en general
 *.cache/

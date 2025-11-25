@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15
+    image: postgres:18
     restart: unless-stopped
     env_file:
       - .env
@@ -8,10 +8,84 @@ services:
       POSTGRES_DB: "${POSTGRES_DB}"
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      TZ: America/Santiago
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_USER: "${POSTGRES_USER}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DB_NAME: "${POSTGRES_DB}"
+      DB_PORT: 5432
+      PYTHONPATH: /app/src
+      TZ: America/Santiago
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tools
+    volumes:
+      - .:/app
+
+  init-db:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: bash scripts/init_db.sh
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_USER: "${POSTGRES_USER}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DB_NAME: "${POSTGRES_DB}"
+      DB_PORT: 5432
+      PYTHONPATH: /app/src
+      TZ: America/Santiago
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - init
+    volumes:
+      - .:/app
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: python src/main.py
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_USER: "${POSTGRES_USER}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DB_NAME: "${POSTGRES_DB}"
+      DB_PORT: 5432
+      PYTHONPATH: /app/src
+      TZ: America/Santiago
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
 
 volumes:
   pgdata:
