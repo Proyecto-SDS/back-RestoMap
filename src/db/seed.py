@@ -1,35 +1,61 @@
 """
 Script de Seed (Datos Iniciales)
 Puebla la base de datos con datos de referencia y ejemplos de testing
+Versión optimizada para Cloud Run y Docker
 """
-import os
 import sys
+import os
+import logging
 from datetime import datetime, date, time, timedelta
 from dotenv import load_dotenv
 
-# Añadir src al path para imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# --- 1. CONFIGURACIÓN DE RUTAS (CRUCIAL PARA CLOUD RUN) ---
+# Obtenemos la ruta absoluta de este archivo (src/db/seed.py)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Obtenemos la ruta 'src' (padre de db)
+src_dir = os.path.dirname(current_dir)
+# Agregamos 'src' al path de Python si no está
+if src_dir not in sys.path:
+    sys.path.append(src_dir)
 
-from database import db_session
-from models.models import (
-    Rol, TipoLocal, Comuna, TipoRed, TipoFoto, Direccion, Local, Categoria,
-    Usuario, Horario, Mesa, Producto, Foto, Redes, Opinion, Favorito,
-    Reserva, ReservaMesa, Pedido, Cuenta, EstadoPedido, QRDinamico,
-    Encomienda, EncomiendaCuenta, Pago,
-    EstadoMesaEnum, EstadoPedidoEnum, EstadoProductoEnum, EstadoReservaEnum,
-    EstadoReservaMesaEnum, EstadoPagoEnum, MetodoPagoEnum, EstadoEncomiendaEnum,
-    TipoHorarioEnum
+# Configuración de Logging (para que se vea bien en Google Cloud)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
+
+try:
+    # --- 2. IMPORTACIONES ---
+    # Importamos la fábrica de sesiones desde database.py
+    from database import SessionLocal
+    
+    # Importamos los modelos
+    # Nota: Usamos "from models import ..." asumiendo que models.py está en src/
+    # Si tienes src/models/models.py, mantén "from models.models import ..."
+    from models import (
+        Rol, TipoLocal, Comuna, TipoRed, TipoFoto, Direccion, Local, Categoria,
+        Usuario, Horario, Mesa, Producto, Foto, Redes, Opinion, Favorito,
+        Reserva, ReservaMesa, Pedido, Cuenta, EstadoPedido, QRDinamico,
+        Encomienda, EncomiendaCuenta, Pago,
+        EstadoMesaEnum, EstadoPedidoEnum, EstadoProductoEnum, EstadoReservaEnum,
+        EstadoReservaMesaEnum, EstadoPagoEnum, MetodoPagoEnum, EstadoEncomiendaEnum,
+        TipoHorarioEnum
+    )
+except ImportError as e:
+    logger.error(f"❌ Error crítico de importación: {e}")
+    logger.error("Asegúrate de que estás ejecutando esto con PYTHONPATH=/app/src o desde la raíz correcta.")
+    sys.exit(1)
 
 def seed_database():
     """Pobla la base de datos con datos iniciales"""
-    db = db_session()
-    print("Poblando base de datos con datos iniciales...")
+    db = SessionLocal()
+    logger.info("🌱 Iniciando proceso de Seed en la base de datos...")
     
     try:
         # ============ Roles ============
         if db.query(Rol).count() == 0:
-            print("  → Insertando Roles...")
+            logger.info("  → Insertando Roles...")
             db.add_all([
                 Rol(nombre="admin"),
                 Rol(nombre="gerente"),
@@ -38,26 +64,26 @@ def seed_database():
                 Rol(nombre="cliente"),
             ])
             db.commit()
-            print("    ✓ Roles insertados")
+            logger.info("    ✓ Roles insertados")
         else:
-            print("  ⊘ Roles ya existen, saltando...")
+            logger.info("  ⊘ Roles ya existen, saltando...")
 
         # ============ Tipos de Local ============
         if db.query(TipoLocal).count() == 0:
-            print("  → Insertando Tipos de Local...")
+            logger.info("  → Insertando Tipos de Local...")
             db.add_all([
                 TipoLocal(nombre="Restaurante"),
                 TipoLocal(nombre="Bar"),
                 TipoLocal(nombre="Restobar"),
             ])
             db.commit()
-            print("    ✓ Tipos de Local insertados")
+            logger.info("    ✓ Tipos de Local insertados")
         else:
-            print("  ⊘ Tipos de Local ya existen, saltando...")
+            logger.info("  ⊘ Tipos de Local ya existen, saltando...")
 
         # ============ Comunas ============
         if db.query(Comuna).count() == 0:
-            print("  → Insertando Comunas de Santiago...")
+            logger.info("  → Insertando Comunas de Santiago...")
             db.add_all([
                 Comuna(nombre="Santiago"),
                 Comuna(nombre="Cerrillos"),
@@ -93,13 +119,13 @@ def seed_database():
                 Comuna(nombre="Vitacura"),
             ])
             db.commit()
-            print("    ✓ Comunas insertadas")
+            logger.info("    ✓ Comunas insertadas")
         else:
-            print("  ⊘ Comunas ya existen, saltando...")
+            logger.info("  ⊘ Comunas ya existen, saltando...")
 
         # ============ Tipos de Redes Sociales ============
         if db.query(TipoRed).count() == 0:
-            print("  → Insertando Tipos de Redes Sociales...")
+            logger.info("  → Insertando Tipos de Redes Sociales...")
             db.add_all([
                 TipoRed(nombre="Sitio Web"),
                 TipoRed(nombre="Instagram"),
@@ -111,13 +137,13 @@ def seed_database():
                 TipoRed(nombre="LinkedIn"),
             ])
             db.commit()
-            print("    ✓ Tipos de Redes Sociales insertados")
+            logger.info("    ✓ Tipos de Redes Sociales insertados")
         else:
-            print("  ⊘ Tipos de Redes Sociales ya existen, saltando...")
+            logger.info("  ⊘ Tipos de Redes Sociales ya existen, saltando...")
 
         # ============ Tipos de Fotos ============
         if db.query(TipoFoto).count() == 0:
-            print("  → Insertando Tipos de Fotos...")
+            logger.info("  → Insertando Tipos de Fotos...")
             db.add_all([
                 TipoFoto(nombre="banner"),
                 TipoFoto(nombre="hero"),
@@ -135,13 +161,13 @@ def seed_database():
                 TipoFoto(nombre="galeria"),
             ])
             db.commit()
-            print("    ✓ Tipos de Fotos insertados")
+            logger.info("    ✓ Tipos de Fotos insertados")
         else:
-            print("  ⊘ Tipos de Fotos ya existen, saltando...")
+            logger.info("  ⊘ Tipos de Fotos ya existen, saltando...")
 
         # ============ Categorías de Productos ============
         if db.query(Categoria).count() == 0:
-            print("  → Insertando Categorías de Productos...")
+            logger.info("  → Insertando Categorías de Productos...")
             db.add_all([
                 Categoria(nombre="Entradas"),
                 Categoria(nombre="Platos Principales"),
@@ -153,15 +179,15 @@ def seed_database():
                 Categoria(nombre="Cafés"),
             ])
             db.commit()
-            print("    ✓ Categorías insertadas")
+            logger.info("    ✓ Categorías insertadas")
         else:
-            print("  ⊘ Categorías ya existen, saltando...")
+            logger.info("  ⊘ Categorías ya existen, saltando...")
 
         # ============ DATOS DE EJEMPLO (Para testing) ============
         
         # Direcciones de ejemplo
         if db.query(Direccion).count() == 0:
-            print("  → Insertando Direcciones de ejemplo...")
+            logger.info("  → Insertando Direcciones de ejemplo...")
             dir1 = Direccion(id_comuna=1, calle="Av. Libertador Bernardo O'Higgins", numero=123, longitud=-70.64827, latitud=-33.45694)
             dir2 = Direccion(id_comuna=23, calle="Av. Providencia", numero=456, longitud=-70.61203, latitud=-33.4314)
             dir3 = Direccion(id_comuna=14, calle="Av. Apoquindo", numero=789, longitud=-70.5679, latitud=-33.4132)
@@ -169,13 +195,13 @@ def seed_database():
             dir5 = Direccion(id_comuna=23, calle="Av. General Bustamante", numero=202, longitud=-70.605, latitud=-33.426)
             db.add_all([dir1, dir2, dir3, dir4, dir5])
             db.commit()
-            print("    ✓ Direcciones de ejemplo insertadas")
+            logger.info("    ✓ Direcciones de ejemplo insertadas")
         else:
-            print("  ⊘ Direcciones ya existen, saltando...")
+            logger.info("  ⊘ Direcciones ya existen, saltando...")
 
         # Locales de ejemplo
         if db.query(Local).count() == 0:
-            print("  → Insertando Locales de ejemplo...")
+            logger.info("  → Insertando Locales de ejemplo...")
             local1 = Local(
                 id_direccion=1, 
                 id_tipo_local=1, 
@@ -218,13 +244,13 @@ def seed_database():
             )
             db.add_all([local1, local2, local3, local4, local5])
             db.commit()
-            print("    ✓ Locales de ejemplo insertados")
+            logger.info("    ✓ Locales de ejemplo insertados")
         else:
-            print("  ⊘ Locales ya existen, saltando...")
+            logger.info("  ⊘ Locales ya existen, saltando...")
 
         # ============ Horarios ============
         if db.query(Horario).count() == 0:
-            print("  → Insertando Horarios de ejemplo...")
+            logger.info("  → Insertando Horarios de ejemplo...")
             # Horarios para Local 1 - Restaurante (Lun-Dom 11:00-20:00)
             for dia in range(1, 8):
                 db.add(Horario(
@@ -266,13 +292,13 @@ def seed_database():
                     abierto=True
                 ))
             db.commit()
-            print("    ✓ Horarios insertados")
+            logger.info("    ✓ Horarios insertados")
         else:
-            print("  ⊘ Horarios ya existen, saltando...")
+            logger.info("  ⊘ Horarios ya existen, saltando...")
 
         # ============ Mesas ============
         if db.query(Mesa).count() == 0:
-            print("  → Insertando Mesas de ejemplo...")
+            logger.info("  → Insertando Mesas de ejemplo...")
             # Mesas para Local 1 - El Gran Sabor (10 mesas de 4 personas)
             for i in range(1, 11):
                 db.add(Mesa(id_local=1, nombre=f"Mesa {i}", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
@@ -300,13 +326,13 @@ def seed_database():
             db.add(Mesa(id_local=5, nombre="Barra 1", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
             db.add(Mesa(id_local=5, nombre="Barra 2", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
             db.commit()
-            print("    ✓ Mesas insertadas")
+            logger.info("    ✓ Mesas insertadas")
         else:
-            print("  ⊘ Mesas ya existen, saltando...")
+            logger.info("  ⊘ Mesas ya existen, saltando...")
 
         # ============ Usuarios ============
         if db.query(Usuario).count() == 0:
-            print("  → Insertando Usuarios de ejemplo...")
+            logger.info("  → Insertando Usuarios de ejemplo...")
             # Hash para password: test123
             password_hash = "$2b$12$q6myteznSC8775D4zt/e6OnPZVMv4jxV9ejhmMRpubGnVA1lecciO"
             db.add_all([
@@ -327,13 +353,13 @@ def seed_database():
                        telefono="933332222"),
             ])
             db.commit()
-            print("    ✓ Usuarios insertados (password: test123)")
+            logger.info("    ✓ Usuarios insertados (password: test123)")
         else:
-            print("  ⊘ Usuarios ya existen, saltando...")
+            logger.info("  ⊘ Usuarios ya existen, saltando...")
 
         # ============ Productos ============
         if db.query(Producto).count() == 0:
-            print("  → Insertando Productos de ejemplo...")
+            logger.info("  → Insertando Productos de ejemplo...")
             # Productos para Local 1 (Restaurante)
             db.add_all([
                 Producto(id_local=1, id_categoria=1, nombre="Empanadas de Pino", 
@@ -366,13 +392,13 @@ def seed_database():
                         descripcion="Con helado", estado=EstadoProductoEnum.DISPONIBLE, precio=3800),
             ])
             db.commit()
-            print("    ✓ Productos insertados")
+            logger.info("    ✓ Productos insertados")
         else:
-            print("  ⊘ Productos ya existen, saltando...")
+            logger.info("  ⊘ Productos ya existen, saltando...")
 
         # ============ Fotos ============
         if db.query(Foto).count() == 0:
-            print("  → Insertando Fotos de ejemplo...")
+            logger.info("  → Insertando Fotos de ejemplo...")
             db.add_all([
                 Foto(id_local=1, id_tipo_foto=1, ruta="https://picsum.photos/seed/local1banner/1200/400"),
                 Foto(id_local=1, id_tipo_foto=4, ruta="https://picsum.photos/seed/local1logo/200/200"),
@@ -382,13 +408,13 @@ def seed_database():
                 Foto(id_producto=2, id_tipo_foto=6, ruta="https://picsum.photos/seed/prod2/400/400"),
             ])
             db.commit()
-            print("    ✓ Fotos insertadas")
+            logger.info("    ✓ Fotos insertadas")
         else:
-            print("  ⊘ Fotos ya existen, saltando...")
+            logger.info("  ⊘ Fotos ya existen, saltando...")
 
         # ============ Redes Sociales ============
         if db.query(Redes).count() == 0:
-            print("  → Insertando Redes Sociales de ejemplo...")
+            logger.info("  → Insertando Redes Sociales de ejemplo...")
             db.add_all([
                 Redes(id_local=1, id_tipo_red=2, nombre_usuario="@gransabor", 
                       url="https://instagram.com/gransabor"),
@@ -398,13 +424,13 @@ def seed_database():
                       url="https://instagram.com/laterraza"),
             ])
             db.commit()
-            print("    ✓ Redes Sociales insertadas")
+            logger.info("    ✓ Redes Sociales insertadas")
         else:
-            print("  ⊘ Redes Sociales ya existen, saltando...")
+            logger.info("  ⊘ Redes Sociales ya existen, saltando...")
 
         # ============ Opiniones ============
         if db.query(Opinion).count() == 0:
-            print("  → Insertando Opiniones de ejemplo...")
+            logger.info("  → Insertando Opiniones de ejemplo...")
             db.add_all([
                 Opinion(id_usuario=2, id_local=1, puntuacion=5, 
                        comentario="Excelente comida y muy buen servicio. Recomendado!"),
@@ -414,13 +440,13 @@ def seed_database():
                        comentario="Buen ambiente, música en vivo los fines de semana."),
             ])
             db.commit()
-            print("    ✓ Opiniones insertadas")
+            logger.info("    ✓ Opiniones insertadas")
         else:
-            print("  ⊘ Opiniones ya existen, saltando...")
+            logger.info("  ⊘ Opiniones ya existen, saltando...")
 
         # ============ Favoritos ============
         if db.query(Favorito).count() == 0:
-            print("  → Insertando Favoritos de ejemplo...")
+            logger.info("  → Insertando Favoritos de ejemplo...")
             db.add_all([
                 Favorito(id_usuario=2, id_local=1),
                 Favorito(id_usuario=2, id_local=3),
@@ -428,13 +454,13 @@ def seed_database():
                 Favorito(id_usuario=3, id_local=2),
             ])
             db.commit()
-            print("    ✓ Favoritos insertados")
+            logger.info("    ✓ Favoritos insertados")
         else:
-            print("  ⊘ Favoritos ya existen, saltando...")
+            logger.info("  ⊘ Favoritos ya existen, saltando...")
 
         # ============ Reservas ============
         if db.query(Reserva).count() == 0:
-            print("  → Insertando Reservas de ejemplo...")
+            logger.info("  → Insertando Reservas de ejemplo...")
             # Reserva confirmada
             reserva1 = Reserva(
                 id_local=1, id_usuario=2,
@@ -459,13 +485,13 @@ def seed_database():
                 ReservaMesa(id_reserva=reserva2.id, id_mesa=6, prioridad=EstadoReservaMesaEnum.ALTA),
             ])
             db.commit()
-            print("    ✓ Reservas insertadas")
+            logger.info("    ✓ Reservas insertadas")
         else:
-            print("  ⊘ Reservas ya existen, saltando...")
+            logger.info("  ⊘ Reservas ya existen, saltando...")
 
         # ============ Pedidos ============
         if db.query(Pedido).count() == 0:
-            print("  → Insertando Pedidos de ejemplo...")
+            logger.info("  → Insertando Pedidos de ejemplo...")
             # Pedido abierto
             pedido1 = Pedido(
                 local_id=1, mesa_id=3, usuario_id=2,
@@ -513,13 +539,13 @@ def seed_database():
                            creado_el=datetime.now() - timedelta(days=1)),
             ])
             db.commit()
-            print("    ✓ Pedidos, Cuentas y Estados insertados")
+            logger.info("    ✓ Pedidos, Cuentas y Estados insertados")
         else:
-            print("  ⊘ Pedidos ya existen, saltando...")
+            logger.info("  ⊘ Pedidos ya existen, saltando...")
 
         # ============ Pagos ============
         if db.query(Pago).count() == 0:
-            print("  → Insertando Pagos de ejemplo...")
+            logger.info("  → Insertando Pagos de ejemplo...")
             # Pago del pedido cerrado
             db.add(Pago(
                 pedido_id=3, metodo=MetodoPagoEnum.CREDITO,
@@ -532,13 +558,13 @@ def seed_database():
                 estado=EstadoPagoEnum.PENDIENTE, monto=25300
             ))
             db.commit()
-            print("    ✓ Pagos insertados")
+            logger.info("    ✓ Pagos insertados")
         else:
-            print("  ⊘ Pagos ya existen, saltando...")
+            logger.info("  ⊘ Pagos ya existen, saltando...")
 
         # ============ QR Dinámicos ============
         if db.query(QRDinamico).count() == 0:
-            print("  → Insertando QR Dinámicos de ejemplo...")
+            logger.info("  → Insertando QR Dinámicos de ejemplo...")
             db.add_all([
                 QRDinamico(
                     id_mesa=3, id_pedido=1, codigo="QR-M3-P1-ABC123",
@@ -550,13 +576,13 @@ def seed_database():
                 ),
             ])
             db.commit()
-            print("    ✓ QR Dinámicos insertados")
+            logger.info("    ✓ QR Dinámicos insertados")
         else:
-            print("  ⊘ QR Dinámicos ya existen, saltando...")
+            logger.info("  ⊘ QR Dinámicos ya existen, saltando...")
 
         # ============ Encomiendas ============
         if db.query(Encomienda).count() == 0:
-            print("  → Insertando Encomiendas de ejemplo...")
+            logger.info("  → Insertando Encomiendas de ejemplo...")
             enc1 = Encomienda(id_pedido=2, estado=EstadoEncomiendaEnum.EN_PREPARACION)
             db.add(enc1)
             db.commit()
@@ -564,33 +590,33 @@ def seed_database():
             # Vincular cuenta con encomienda
             db.add(EncomiendaCuenta(id_cuenta=3, id_encomienda=enc1.id))
             db.commit()
-            print("    ✓ Encomiendas insertadas")
+            logger.info("    ✓ Encomiendas insertadas")
         else:
-            print("  ⊘ Encomiendas ya existen, saltando...")
+            logger.info("  ⊘ Encomiendas ya existen, saltando...")
         
-        print("\nBase de datos poblada exitosamente con datos completos!")
-        print("\nResumen de datos insertados:")
-        print(f"   • Roles: {db.query(Rol).count()}")
-        print(f"   • Usuarios: {db.query(Usuario).count()}")
-        print(f"   • Locales: {db.query(Local).count()}")
-        print(f"   • Mesas: {db.query(Mesa).count()}")
-        print(f"   • Productos: {db.query(Producto).count()}")
-        print(f"   • Pedidos: {db.query(Pedido).count()}")
-        print(f"   • Reservas: {db.query(Reserva).count()}")
-        print(f"   • Opiniones: {db.query(Opinion).count()}")
-        print(f"   • Pagos: {db.query(Pago).count()}")
+        logger.info("✅ Base de datos poblada exitosamente con datos completos!")
+        logger.info("\nResumen de datos insertados:")
+        logger.info(f"   • Roles: {db.query(Rol).count()}")
+        logger.info(f"   • Usuarios: {db.query(Usuario).count()}")
+        logger.info(f"   • Locales: {db.query(Local).count()}")
+        logger.info(f"   • Mesas: {db.query(Mesa).count()}")
+        logger.info(f"   • Productos: {db.query(Producto).count()}")
+        logger.info(f"   • Pedidos: {db.query(Pedido).count()}")
+        logger.info(f"   • Reservas: {db.query(Reserva).count()}")
+        logger.info(f"   • Opiniones: {db.query(Opinion).count()}")
+        logger.info(f"   • Pagos: {db.query(Pago).count()}")
         
     except Exception as e:
-        print(f"\nError al poblar la base de datos: {e}")
+        logger.error(f"❌ Error fatal al poblar la base de datos: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         db.rollback()
         sys.exit(1)
     finally:
         db.close()
 
 if __name__ == "__main__":
-    # Cargar variables de entorno
+    # Cargar variables de entorno (solo si se corre local)
     load_dotenv()
     
     # Ejecutar seed
