@@ -1,8 +1,8 @@
-name: Despliegue Back PROD
+name: Despliegue BACK QA
 
 on:
   push:
-    branches: [ "main" ] # Se activa solo en rama main
+    branches: [ "develop" ] # Se activa solo en rama main
   workflow_dispatch:
 
 env:
