@@ -25,14 +25,22 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Configurar URL de base de datos desde variables de entorno
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+DB_HOST = os.getenv("DB_HOST") # En Cloud Run será: /cloudsql/proyecto:region:instancia
+DB_PORT = os.getenv("DB_PORT", "5432") # Valor por defecto por seguridad
 DB_NAME = os.getenv("DB_NAME")
 
-DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# LÓGICA HÍBRIDA (La solución)
+if DB_HOST and DB_HOST.startswith("/cloudsql"):
+    # Conexión vía Unix Socket (Para Cloud Run)
+    # Nota el formato: @/{DB_NAME}?host={DB_HOST}
+    DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@/{DB_NAME}?host={DB_HOST}"
+else:
+    # Conexión vía TCP (Para Localhost)
+    DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# Asignar la URL generada
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # add your model's MetaData object here
