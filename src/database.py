@@ -8,28 +8,36 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
-# Cargar variables de entorno desde .env
+# Cargar variables de entorno desde .env (solo para local)
 load_dotenv()
 
 # Base declarativa de SQLAlchemy
-# NOTA: Esta Base será importada por models.py
 Base = declarative_base()
 
-# Leer las variables de entorno para la base de datos
+# Leer las variables de entorno
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
+# Usamos '5432' por defecto si no existe la variable, para evitar errores en Cloud Run
+DB_PORT = os.getenv("DB_PORT", "5432") 
 
-# Validar que todas las variables necesarias estén presentes
-if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
-    raise ValueError("Una o más variables de entorno de la base de datos no están configuradas.")
+# Validar solo las variables CRÍTICAS (Quitamos DB_PORT de la validación obligatoria)
+if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
+    raise ValueError("Faltan variables de entorno críticas (DB_USER, DB_PASSWORD, DB_HOST o DB_NAME).")
 
-# Construir la URL de la base de datos
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# --- LÓGICA DE CONEXIÓN HÍBRIDA (CLOUD RUN vs LOCAL) ---
+if DB_HOST.startswith("/cloudsql"):
+    # Conexión vía Unix Socket (Para Cloud Run)
+    # Formato: postgresql://user:pass@/dbname?host=/cloudsql/instance
+    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@/{DB_NAME}?host={DB_HOST}"
+else:
+    # Conexión vía TCP (Para Local)
+    # Formato: postgresql://user:pass@host:port/dbname
+    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Crear engine de SQLAlchemy
+# pool_pre_ping=True es vital para evitar desconexiones en la nube
 engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 
 # Crear SessionLocal (factory de sesiones)
@@ -42,12 +50,6 @@ db_session = scoped_session(SessionLocal)
 def get_db():
     """
     Generador de sesiones para usar en dependencias o contextos.
-    Uso:
-        db = next(get_db())
-        try:
-            # usar db
-        finally:
-            db.close()
     """
     db = SessionLocal()
     try:
@@ -55,5 +57,5 @@ def get_db():
     finally:
         db.close()
 
-# Exponer elementos para importación desde otros módulos
+# Exponer elementos
 __all__ = ["Base", "engine", "DATABASE_URL", "db_session", "SessionLocal", "get_db"]
