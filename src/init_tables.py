@@ -9,9 +9,9 @@ sys.path.append(os.path.dirname(current_dir))
 
 try:
     from database import engine, Base
-    # Asegúrate de importar tus modelos aquí
-    # Si tus modelos están en models.py, esto está bien:
-    from models import * def init_db():
+    # Importamos los modelos
+    from models import * # --- AQUÍ ESTABA EL ERROR (Debe haber un salto de línea) ---
+    def init_db():
         print(f"Iniciando creación de tablas en: {engine.url}")
         try:
             Base.metadata.create_all(bind=engine)
