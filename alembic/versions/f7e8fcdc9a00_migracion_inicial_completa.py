@@ -1,8 +1,8 @@
-"""Migracion inicial
+"""Migracion inicial completa
 
-Revision ID: 451d73b4102a
+Revision ID: f7e8fcdc9a00
 Revises: 
-Create Date: 2025-11-24 08:47:55.853839
+Create Date: 2025-11-25 22:08:36.912596
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '451d73b4102a'
+revision: str = 'f7e8fcdc9a00'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -63,6 +63,7 @@ def upgrade() -> None:
     op.create_table('direccion',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_comuna', sa.Integer(), nullable=True),
+    sa.Column('calle', sa.String(length=200), nullable=False),
     sa.Column('numero', sa.Integer(), nullable=False),
     sa.Column('longitud', sa.Numeric(), nullable=False),
     sa.Column('latitud', sa.Numeric(), nullable=False),
@@ -91,6 +92,7 @@ def upgrade() -> None:
     sa.Column('id_direccion', sa.Integer(), nullable=False),
     sa.Column('id_tipo_local', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=200), nullable=False),
+    sa.Column('descripcion', sa.Text(), nullable=True),
     sa.Column('telefono', sa.Integer(), nullable=False),
     sa.Column('correo', sa.String(length=50), nullable=False),
     sa.ForeignKeyConstraint(['id_direccion'], ['direccion.id'], ondelete='CASCADE'),
@@ -135,6 +137,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_local', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=30), nullable=False),
+    sa.Column('descripcion', sa.String(length=100), nullable=True),
     sa.Column('capacidad', sa.SmallInteger(), nullable=False),
     sa.Column('estado', sa.Enum('DISPONIBLE', 'RESERVADA', 'OCUPADA', 'FUERA_DE_SERVICIO', name='estado_mesa_enum'), nullable=False),
     sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
@@ -279,34 +282,34 @@ def upgrade() -> None:
     op.create_table('pago',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('pedido_id', sa.Integer(), nullable=True),
-    sa.Column('reserva_id', sa.Integer(), nullable=True),
     sa.Column('metodo', sa.Enum('EFECTIVO', 'TRANSFERENCIA', 'DEBITO', 'CREDITO', 'APP_DE_PAGO', 'OTRO', name='metodo_pago_enum'), nullable=False),
     sa.Column('estado', sa.Enum('PENDIENTE', 'COBRADO', 'CANCELADO', name='estado_pago_enum'), nullable=False),
     sa.Column('monto', sa.Integer(), nullable=False),
     sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('actualizado_el', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['pedido_id'], ['pedido.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['reserva_id'], ['reserva.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_pago_creado_el'), 'pago', ['creado_el'], unique=False)
     op.create_index(op.f('ix_pago_id'), 'pago', ['id'], unique=False)
     op.create_index(op.f('ix_pago_pedido_id'), 'pago', ['pedido_id'], unique=False)
-    op.create_index(op.f('ix_pago_reserva_id'), 'pago', ['reserva_id'], unique=False)
     op.create_table('qr_dinamico',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_mesa', sa.Integer(), nullable=False),
-    sa.Column('id_pedido', sa.Integer(), nullable=False),
+    sa.Column('id_pedido', sa.Integer(), nullable=True),
+    sa.Column('id_reserva', sa.Integer(), nullable=True),
     sa.Column('codigo', sa.String(length=255), nullable=False),
     sa.Column('expiracion', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('activo', sa.Boolean(), nullable=False),
     sa.ForeignKeyConstraint(['id_mesa'], ['mesa.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['id_pedido'], ['pedido.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_reserva'], ['reserva.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('codigo')
     )
     op.create_index(op.f('ix_qr_dinamico_id_mesa'), 'qr_dinamico', ['id_mesa'], unique=False)
     op.create_index(op.f('ix_qr_dinamico_id_pedido'), 'qr_dinamico', ['id_pedido'], unique=False)
+    op.create_index(op.f('ix_qr_dinamico_id_reserva'), 'qr_dinamico', ['id_reserva'], unique=False)
     op.create_table('redes',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_local', sa.Integer(), nullable=False),
@@ -349,10 +352,10 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_redes_id_foto'), table_name='redes')
     op.drop_index(op.f('ix_redes_id'), table_name='redes')
     op.drop_table('redes')
+    op.drop_index(op.f('ix_qr_dinamico_id_reserva'), table_name='qr_dinamico')
     op.drop_index(op.f('ix_qr_dinamico_id_pedido'), table_name='qr_dinamico')
     op.drop_index(op.f('ix_qr_dinamico_id_mesa'), table_name='qr_dinamico')
     op.drop_table('qr_dinamico')
-    op.drop_index(op.f('ix_pago_reserva_id'), table_name='pago')
     op.drop_index(op.f('ix_pago_pedido_id'), table_name='pago')
     op.drop_index(op.f('ix_pago_id'), table_name='pago')
     op.drop_index(op.f('ix_pago_creado_el'), table_name='pago')

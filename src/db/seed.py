@@ -301,30 +301,31 @@ def seed_database():
             logger.info("  → Insertando Mesas de ejemplo...")
             # Mesas para Local 1 - El Gran Sabor (10 mesas de 4 personas)
             for i in range(1, 11):
-                db.add(Mesa(id_local=1, nombre=f"Mesa {i}", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+                db.add(Mesa(id_local=1, nombre=f"Mesa {i}", descripcion=f"Mesa para 4 personas - Zona principal", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
             # Mesas para Local 2 - Bar La Terraza (5 mesas de 6 personas)
             for i in range(1, 6):
-                db.add(Mesa(id_local=2, nombre=f"Mesa {i}", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
+                db.add(Mesa(id_local=2, nombre=f"Mesa {i}", descripcion=f"Mesa para 6 personas - Terraza", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
             # Mesas para Local 3 - Restobar del Parque (8 mesas variadas)
-            db.add(Mesa(id_local=3, nombre="Mesa 1", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 2", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 3", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 4", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 5", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 6", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 7", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=3, nombre="Mesa 8", capacidad=8, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 1", descripcion="Mesa íntima junto a la ventana", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 2", descripcion="Mesa íntima en el balcón", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 3", descripcion="Mesa estándar", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 4", descripcion="Mesa estándar", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 5", descripcion="Mesa estándar", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 6", descripcion="Mesa familiar", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 7", descripcion="Mesa familiar", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=3, nombre="Mesa 8", descripcion="Mesa grande para grupos", capacidad=8, estado=EstadoMesaEnum.DISPONIBLE))
             # Mesas para Local 4 - Rincón Peruano (7 mesas)
             for i in range(1, 8):
                 capacidad = 4 if i <= 5 else 6
-                db.add(Mesa(id_local=4, nombre=f"Mesa {i}", capacidad=capacidad, estado=EstadoMesaEnum.DISPONIBLE))
+                desc = "Mesa estándar" if capacidad == 4 else "Mesa familiar"
+                db.add(Mesa(id_local=4, nombre=f"Mesa {i}", descripcion=desc, capacidad=capacidad, estado=EstadoMesaEnum.DISPONIBLE))
             # Mesas para Local 5 - The Old Pub (6 mesas)
-            db.add(Mesa(id_local=5, nombre="Mesa 1", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=5, nombre="Mesa 2", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=5, nombre="Mesa 3", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=5, nombre="Mesa 4", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=5, nombre="Barra 1", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
-            db.add(Mesa(id_local=5, nombre="Barra 2", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=5, nombre="Mesa 1", descripcion="Mesa estándar", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=5, nombre="Mesa 2", descripcion="Mesa estándar", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=5, nombre="Mesa 3", descripcion="Mesa grande", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=5, nombre="Mesa 4", descripcion="Mesa grande", capacidad=6, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=5, nombre="Barra 1", descripcion="Asiento en barra alta", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
+            db.add(Mesa(id_local=5, nombre="Barra 2", descripcion="Asiento en barra alta", capacidad=2, estado=EstadoMesaEnum.DISPONIBLE))
             db.commit()
             logger.info("    ✓ Mesas insertadas")
         else:
@@ -566,13 +567,19 @@ def seed_database():
         if db.query(QRDinamico).count() == 0:
             logger.info("  → Insertando QR Dinámicos de ejemplo...")
             db.add_all([
+                # QR vinculado a pedido
                 QRDinamico(
-                    id_mesa=3, id_pedido=1, codigo="QR-M3-P1-ABC123",
+                    id_mesa=3, id_pedido=1, id_reserva=None, codigo="QR-M3-P1-ABC123",
                     expiracion=datetime.now() + timedelta(hours=4), activo=True
                 ),
                 QRDinamico(
-                    id_mesa=4, id_pedido=2, codigo="QR-M4-P2-XYZ789",
+                    id_mesa=4, id_pedido=2, id_reserva=None, codigo="QR-M4-P2-XYZ789",
                     expiracion=datetime.now() + timedelta(hours=4), activo=True
+                ),
+                # QR vinculado a reserva
+                QRDinamico(
+                    id_mesa=1, id_pedido=None, id_reserva=1, codigo="QR-M1-R1-DEF456",
+                    expiracion=datetime.now() + timedelta(days=2), activo=True
                 ),
             ])
             db.commit()

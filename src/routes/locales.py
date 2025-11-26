@@ -378,6 +378,7 @@ def obtener_mesas_local(id):
             mesas_lista.append({
                 'id': str(mesa.id),
                 'nombre': mesa.nombre,
+                'descripcion': mesa.descripcion,
                 'capacidad': mesa.capacidad,
                 'estado': mesa.estado.value if mesa.estado else 'disponible'
             })

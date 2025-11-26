@@ -6,7 +6,7 @@ Compatible con: Flask, SQLAlchemy, PostgreSQL, Pydantic v2
 ========================================
 """
 
-from datetime import datetime
+from datetime import datetime, date, time
 from enum import Enum as PyEnum
 from decimal import Decimal
 from typing import Optional, List, Dict
@@ -395,6 +395,7 @@ class Mesa(Base):
     id = Column(Integer, primary_key=True, index=True)
     id_local = Column(Integer, ForeignKey("local.id", ondelete="CASCADE"), nullable=False, index=True)
     nombre = Column(String(30), nullable=False)
+    descripcion = Column(String(100), nullable=True)
     capacidad = Column(SmallInteger, nullable=False)
     estado = Column(Enum(EstadoMesaEnum, name="estado_mesa_enum"), nullable=False, default=EstadoMesaEnum.DISPONIBLE)
     
@@ -534,6 +535,7 @@ class Reserva(Base):
     usuario = relationship("Usuario", back_populates="reservas", lazy="joined")
     local = relationship("Local", back_populates="reservas", lazy="joined")
     reservas_mesa = relationship("ReservaMesa", back_populates="reserva", lazy="select", cascade="all, delete-orphan")
+    qr_dinamicos = relationship("QRDinamico", back_populates="reserva", lazy="select", cascade="all, delete-orphan")
 
 class ReservaMesa(Base):
     __tablename__ = "reserva_mesa"
@@ -609,13 +611,15 @@ class QRDinamico(Base):
     
     id = Column(Integer, primary_key=True, index=False)
     id_mesa = Column(Integer, ForeignKey("mesa.id", ondelete="CASCADE"), nullable=False, index=True)
-    id_pedido = Column(Integer, ForeignKey("pedido.id", ondelete="CASCADE"), nullable=False, index=True)
+    id_pedido = Column(Integer, ForeignKey("pedido.id", ondelete="CASCADE"), nullable=True, index=True)
+    id_reserva = Column(Integer, ForeignKey("reserva.id", ondelete="CASCADE"), nullable=True, index=True)
     codigo = Column(String(255), nullable=False, unique=True)
     expiracion = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
     
     mesa = relationship("Mesa", back_populates="qr_dinamicos", lazy="joined")
     pedido = relationship("Pedido", back_populates="qr_dinamicos", lazy="joined")
+    reserva = relationship("Reserva", back_populates="qr_dinamicos", lazy="joined")
 
 # ============================================
 # ENCOMIENDAS
@@ -724,3 +728,69 @@ class PagoSchema(BaseModel):
     class Config:
         from_attributes = True
 
+class MesaSchema(BaseModel):
+    id: Optional[int] = None
+    id_local: int
+    nombre: str
+    descripcion: Optional[str] = None
+    capacidad: int
+    estado: EstadoMesaEnum
+
+    class Config:
+        from_attributes = True
+
+class QRDinamicoSchema(BaseModel):
+    id: Optional[int] = None
+    id_mesa: int
+    id_pedido: Optional[int] = None
+    id_reserva: Optional[int] = None
+    codigo: str
+    expiracion: datetime
+    activo: bool
+
+    class Config:
+        from_attributes = True
+
+class ReservaSchema(BaseModel):
+    id: Optional[int] = None
+    id_local: int
+    id_usuario: int
+    fecha_reserva: date
+    hora_reserva: time
+    estado: EstadoReservaEnum
+    creado_el: Optional[datetime] = None
+    expirado_el: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class OpinionSchema(BaseModel):
+    id: Optional[int] = None
+    id_usuario: int
+    id_local: int
+    puntuacion: float
+    comentario: str
+    creado_el: Optional[datetime] = None
+    eliminado_el: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class CuentaSchema(BaseModel):
+    id: Optional[int] = None
+    id_pedido: int
+    id_producto: int
+    cantidad: int
+    observaciones: str
+
+    class Config:
+        from_attributes = True
+
+class EncomiendaSchema(BaseModel):
+    id: Optional[int] = None
+    id_pedido: int
+    estado: EstadoEncomiendaEnum
+    creado_el: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

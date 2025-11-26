@@ -75,6 +75,12 @@ from .models import (
     ProductoSchema,
     PedidoSchema,
     PagoSchema,
+    MesaSchema,
+    QRDinamicoSchema,
+    ReservaSchema,
+    OpinionSchema,
+    CuentaSchema,
+    EncomiendaSchema,
     
     # ============ Funciones Auxiliares ============
     obtener_etiqueta,
@@ -154,6 +160,12 @@ __all__ = [
     "ProductoSchema",
     "PedidoSchema",
     "PagoSchema",
+    "MesaSchema",
+    "QRDinamicoSchema",
+    "ReservaSchema",
+    "OpinionSchema",
+    "CuentaSchema",
+    "EncomiendaSchema",
     
     # Funciones Auxiliares
     "obtener_etiqueta",

@@ -22,7 +22,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: dockerfile.backend
     env_file:
       - .env
     environment:
@@ -44,7 +44,7 @@ services:
   init-db:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: dockerfile.backend
     command: bash scripts/init_db.sh
     env_file:
       - .env
@@ -67,7 +67,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: dockerfile.backend
     command: python src/main.py
     ports:
       - "5000:5000"
