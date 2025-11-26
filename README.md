@@ -2,7 +2,7 @@
 
 Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de locales, pedidos y reservas.
 
-## Tabla de Contenidos
+## Tabla de Contenido
 
 - [Requisitos](#requisitos)
 - [Estructura del Proyecto](#estructura-del-proyecto)
