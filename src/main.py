@@ -15,7 +15,15 @@ def create_app():
     app = Flask(__name__)
     
     # Configurar CORS (permitir peticiones del frontend)
-    CORS(app)
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:3000", "http://localhost:3001"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
     
     # Configuración básica
     app.config['JSON_SORT_KEYS'] = False
@@ -35,11 +43,13 @@ def create_app():
     from routes.auth import auth_bp
     from routes.opiniones import opiniones_bp
     from routes.reservas import reservas_bp
+    from routes.favoritos import favoritos_bp
     
     app.register_blueprint(locales_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(opiniones_bp)
     app.register_blueprint(reservas_bp)
+    app.register_blueprint(favoritos_bp)
 
 
     return app
