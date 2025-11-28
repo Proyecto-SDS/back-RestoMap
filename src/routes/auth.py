@@ -6,10 +6,13 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import bcrypt
+import logging
 
 from database import SessionLocal
 from models.models import Usuario, Rol
 from utils.jwt_helper import crear_token, requerir_auth
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -107,7 +110,7 @@ def login():
         }), 200
         
     except Exception as e:
-        print(f"Error en login: {str(e)}")
+        logger.error(f"Error en login: {str(e)}")
         return jsonify({'error': 'Error al procesar la solicitud'}), 500
 
 
@@ -197,7 +200,7 @@ def register():
         }), 201
         
     except Exception as e:
-        print(f"Error en register: {str(e)}")
+        logger.error(f"Error en register: {str(e)}")
         return jsonify({'error': 'Error al procesar la solicitud'}), 500
 
 
@@ -267,7 +270,7 @@ def get_profile(user_id, user_rol):
         }), 200
         
     except Exception as e:
-        print(f"Error en get_profile: {str(e)}")
+        logger.error(f"Error en get_profile: {str(e)}")
         return jsonify({'error': 'Error al procesar la solicitud'}), 500
 
 
@@ -350,5 +353,5 @@ def update_profile(user_id, user_rol):
         }), 200
         
     except Exception as e:
-        print(f"Error en update_profile: {str(e)}")
+        logger.error(f"Error en update_profile: {str(e)}")
         return jsonify({'error': 'Error al procesar la solicitud'}), 500

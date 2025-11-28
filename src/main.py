@@ -2,6 +2,14 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from database import db_session
 import os
+import logging
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
@@ -42,8 +50,11 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", "5000"))
 
-    debug_mode = os.environ.get("FLASK_ENV") == "development"
+    # Activar debug mode si ENV es dev o development
+    env = os.environ.get("ENV", "production")
+    debug_mode = env in ["dev", "development"]
 
-    print(f"Iniciando servidor en el puerto: {port}")
+    logger.info(f"Iniciando servidor en el puerto: {port}")
+    logger.info(f"Modo debug: {debug_mode} (ENV={env})")
     # Ejecutar en modo debug si se corre directamente
     app.run(host="0.0.0.0", port=port, debug=debug_mode)
