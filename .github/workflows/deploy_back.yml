@@ -42,12 +42,15 @@ jobs:
       uses: google-github-actions/setup-gcloud@v2
 
     # --- Construcción y Push de la Imagen Docker ---
+# --- Construcción y Push de la Imagen Docker ---
     - name: 🔨 Build and Push Docker Image
       id: build-push
       run: |
         gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev
         IMAGE_URI=${GCP_REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest
-        docker build -t $IMAGE_URI .
+        docker build -f dockerfile.backend -t $IMAGE_URI .
+        
+        # Subir la imagen
         docker push $IMAGE_URI
         echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
