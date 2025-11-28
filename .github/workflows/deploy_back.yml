@@ -1,0 +1,100 @@
+name: despliegue de entorno de pruebas para backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch a probar (ej: feat/bugfix-branch)'
+        required: true
+        default: 'develop'
+      duration_minutes:
+        description: 'Duración del servicio de pruebas (en minutos)'
+        required: false
+        default: 60 # El servicio se eliminará automáticamente después de 30 minutos
+        type: number
+
+env:
+  PROJECT_ID: restomap-478918
+  GCP_REGION: us-central1
+  REPO_NAME: repo
+  SERVICE_NAME: test-backend-${{ github.event.inputs.branch }}-${{ github.run_id }} # Nombre único para el servicio
+
+jobs:
+  deploy-backend-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Necesario para WIF
+
+    steps:
+    - name: ⬇️ Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.branch }} # Usa la rama ingresada por el usuario
+
+    - name: 🔑 Autenticación con GCP (WIF)
+      uses: google-github-actions/auth@v2
+      with:
+        # Reemplaza con tus valores de WIF
+        workload_identity_provider: 'projects/414435283954/locations/global/workloadIdentityPools/github-pool/providers/github-provider1'
+        service_account: 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com'
+
+    - name: 🏗️ Setup Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    # --- Construcción y Push de la Imagen Docker ---
+    - name: 🔨 Build and Push Docker Image
+      id: build-push
+      run: |
+        # Configurar Docker para usar Artifact Registry
+        gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev
+        
+        # Construir la imagen (asume un Dockerfile en la raíz)
+        IMAGE_URI=${GCP_REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest
+        docker build -t $IMAGE_URI .
+        
+        # Subir la imagen
+        docker push $IMAGE_URI
+        echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+    # --- Despliegue del Servicio en Cloud Run ---
+    - name: 🚀 Deploy Cloud Run Service for Testing
+      id: deploy
+      run: |
+        # Despliegue temporal en Cloud Run
+        gcloud run deploy ${SERVICE_NAME} \
+          --image ${{ steps.build-push.outputs.image_uri }} \
+          --region ${GCP_REGION} \
+          --platform managed \
+          --no-allow-unauthenticated \
+          --cpu 1 \
+          --memory 512Mi \
+          --set-env-vars "DB_HOST=..., DB_USER=..." \
+          --quiet
+          
+        # Obtener la URL del servicio
+        SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${GCP_REGION} --format 'value(status.url)')
+        echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+        echo "::notice title=Deployment Successful::🔗 URL de Pruebas: $SERVICE_URL"
+        
+    - name: ✅ Show Test URL
+      run: |
+        echo "### 🎉 Despliegue de Pruebas Listo"
+        echo "El entorno de pruebas de tu rama **${{ github.event.inputs.branch }}** está activo en:"
+        echo "[API Endpoint](${{ steps.deploy.outputs.service_url }})"
+        echo "---"
+        echo "Este servicio se eliminará en **${{ github.event.inputs.duration_minutes }}** minutos."
+
+    # --- Tarea de Limpieza ---
+    - name: ⏳ Wait and Cleanup (Crucial para costos)
+      if: always()
+      run: |
+        DURATION=${{ github.event.inputs.duration_minutes }}
+        if [ "$DURATION" -gt 0 ]; then
+          echo "Esperando ${DURATION} minutos..."
+          sleep $((${DURATION} * 60))
+        fi
+        
+        echo "Iniciando limpieza de recursos..."
+        gcloud run services delete ${SERVICE_NAME} --region ${GCP_REGION} --quiet || true
+        echo "🗑️ Servicio de Cloud Run eliminado."
