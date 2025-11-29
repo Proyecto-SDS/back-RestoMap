@@ -11,7 +11,7 @@ on:
       duration_minutes:
         description: 'Duración del servicio de pruebas (en minutos)'
         required: false
-        default: 60
+        default: 15
         type: number
 
 env:
