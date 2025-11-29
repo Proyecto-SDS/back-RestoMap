@@ -23,14 +23,14 @@ try:
         logger.info(f"Iniciando creación de tablas en: {engine.url}")
         try:
             Base.metadata.create_all(bind=engine)
-            logger.info("✅ ¡Tablas creadas exitosamente!")
+            logger.info("¡Tablas creadas exitosamente!")
         except Exception as e:
-            logger.error(f"❌ Error fatal creando tablas: {e}")
+            logger.error(f"Error fatal creando tablas: {e}")
             sys.exit(1)
 
     if __name__ == "__main__":
         init_db()
 
 except ImportError as e:
-    logger.error(f"❌ Error de importación (Rutas): {e}")
+    logger.error(f"Error de importación (Rutas): {e}")
     sys.exit(1)

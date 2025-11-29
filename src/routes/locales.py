@@ -60,10 +60,10 @@ def obtener_locales():
             # Obtener imagen principal
             image = None
             if local.fotos:
-                # Buscar foto de tipo "banner" o "hero" o tomar la primera
+                # Buscar foto de tipo "banner" o tomar la primera disponible
                 foto_principal = next(
                     (f for f in local.fotos 
-                     if f.tipo_foto and f.tipo_foto.nombre in ['banner', 'hero', 'logo']), 
+                     if f.tipo_foto and f.tipo_foto.nombre == 'banner'), 
                     None
                 )
                 if foto_principal:
@@ -182,7 +182,8 @@ def obtener_local(id):
         # Obtener todas las fotos organizadas por tipo
         fotos_dict = {
             'banner': [],
-            'hero': [],
+            'capturas': [],
+            'hero': [], # Mantener vacío por compatibilidad
             'logo': None,
             'galeria': [],
             'todas': []
@@ -193,12 +194,16 @@ def obtener_local(id):
                 fotos_dict['todas'].append(foto.ruta)
                 if foto.tipo_foto:
                     tipo_nombre = foto.tipo_foto.nombre.lower()
-                    if tipo_nombre in ['banner', 'hero']:
-                        fotos_dict[tipo_nombre].append(foto.ruta)
-                    elif tipo_nombre == 'logo':
-                        fotos_dict['logo'] = foto.ruta
-                    else:
-                        fotos_dict['galeria'].append(foto.ruta)
+                    
+                    if tipo_nombre == 'banner':
+                        fotos_dict['banner'].append(foto.ruta)
+                    elif tipo_nombre == 'capturas':
+                        fotos_dict['capturas'].append(foto.ruta)
+                        fotos_dict['galeria'].append(foto.ruta) # Mapear capturas a galeria
+        
+        # Intentar asignar logo si hay capturas (fallback)
+        if fotos_dict['capturas']:
+            fotos_dict['logo'] = fotos_dict['capturas'][0]
         
         # Obtener redes sociales
         redes_sociales = []
