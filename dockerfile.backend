@@ -27,4 +27,5 @@ COPY . .
 ENV PYTHONPATH=/app/src
 
 # Comando por defecto (ajustado a la nueva estructura)
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "src.main:app"]
+
+CMD ["python", "src/main.py"]
