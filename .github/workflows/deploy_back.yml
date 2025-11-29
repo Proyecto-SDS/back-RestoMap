@@ -118,7 +118,7 @@ jobs:
           --image ${{ steps.build-push.outputs.image_uri }} \
           --region ${GCP_REGION} \
           --platform managed \
-          --no-allow-unauthenticated \
+          --allow-unauthenticated \
           --cpu 1 \
           --memory 512Mi \
           --service-account 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com' \
