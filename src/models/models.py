@@ -372,6 +372,7 @@ class Local(Base):
     favoritos = relationship("Favorito", back_populates="local", lazy="select", cascade="all, delete-orphan")
     reservas = relationship("Reserva", back_populates="local", lazy="select", cascade="all, delete-orphan")
     pedidos = relationship("Pedido", back_populates="local", lazy="select", cascade="all, delete-orphan")
+    empleados = relationship("Usuario", back_populates="local", lazy="select")
 
 class Horario(Base):
     __tablename__ = "horario"
@@ -416,9 +417,11 @@ class Usuario(Base):
     correo = Column(String(100), unique=True, nullable=False, index=True)
     contrasena = Column(String(200), nullable=False)
     telefono = Column(String(32), nullable=False)
+    id_local = Column(Integer, ForeignKey("local.id", ondelete="SET NULL"), nullable=True, index=True)
     creado_el = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     
     rol = relationship("Rol", back_populates="usuarios", lazy="joined")
+    local = relationship("Local", back_populates="empleados", lazy="joined")
     opiniones = relationship("Opinion", back_populates="usuario", lazy="select", cascade="all, delete-orphan")
     favoritos = relationship("Favorito", back_populates="usuario", lazy="select", cascade="all, delete-orphan")
     reservas = relationship("Reserva", back_populates="usuario", lazy="select", cascade="all, delete-orphan")
