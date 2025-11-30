@@ -7,9 +7,11 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime, date, time
 
 from database import db_session
-from models import Reserva, ReservaMesa, Local, Mesa, Usuario
+from models import Reserva, ReservaMesa, Local, Mesa, Usuario, QRDinamico, Foto, Direccion
 from models.models import EstadoReservaEnum, EstadoReservaMesaEnum
 from utils.jwt_helper import requerir_auth
+from services.qr_service import crear_qr_reserva, generar_qr_imagen
+import json
 
 reservas_bp = Blueprint('reservas', __name__, url_prefix='/api/reservas')
 
@@ -160,6 +162,27 @@ def crear_reserva(user_id, user_rol):
         db_session.add(reserva_mesa)
         db_session.commit()
         
+        # Generar QR dinámico para la reserva
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            logger.info(f"[DEBUG] Generando QR para reserva {nueva_reserva.id}, mesa {mesa_id}")
+            codigo_qr, qr_base64 = crear_qr_reserva(
+                id_reserva=nueva_reserva.id,
+                id_mesa=mesa_id,
+                minutos_tolerancia=10  # Expira 10 minutos después de la hora de reserva
+            )
+            logger.info(f"[DEBUG] QR generado exitosamente. Código: {codigo_qr}")
+            logger.info(f"[DEBUG] QR base64 length: {len(qr_base64) if qr_base64 else 0}")
+        except Exception as e:
+            import traceback
+            logger.error(f"[ERROR] Fallo al generar QR: {str(e)}")
+            logger.error(traceback.format_exc())
+            # Si falla la generación del QR, no fallar toda la reserva
+            codigo_qr = None
+            qr_base64 = None
+        
         return jsonify({
             'success': True,
             'message': 'Reserva creada exitosamente',
@@ -172,7 +195,9 @@ def crear_reserva(user_id, user_rol):
                 'fecha': fecha_str,
                 'hora': hora_str,
                 'estado': 'pendiente',
-                'numeroPersonas': numero_personas
+                'numeroPersonas': numero_personas,
+                'codigoQR': codigo_qr,
+                'qrImage': qr_base64
             }
         }), 201
         
@@ -210,8 +235,11 @@ def obtener_mis_reservas(user_id, user_rol):
     try:
         reservas = db_session.query(Reserva)\
             .options(
-                joinedload(Reserva.local),
-                joinedload(Reserva.reservas_mesa).joinedload(ReservaMesa.mesa)
+                joinedload(Reserva.local).joinedload(Local.direccion),
+                joinedload(Reserva.local).joinedload(Local.fotos),
+                joinedload(Reserva.local).joinedload(Local.tipo_local),
+                joinedload(Reserva.reservas_mesa).joinedload(ReservaMesa.mesa),
+                joinedload(Reserva.qr_dinamicos)
             )\
             .filter(Reserva.id_usuario == user_id)\
             .order_by(Reserva.fecha_reserva.desc(), Reserva.hora_reserva.desc())\
@@ -221,14 +249,61 @@ def obtener_mis_reservas(user_id, user_rol):
         for reserva in reservas:
             mesas_nombres = [rm.mesa.nombre for rm in reserva.reservas_mesa if rm.mesa]
             
+            # Obtener código QR activo
+            qr_codigo = None
+            if reserva.qr_dinamicos:
+                # Buscar el QR más reciente o activo
+                qr = next((q for q in reserva.qr_dinamicos if q.activo), None)
+                if qr:
+                    qr_codigo = qr.codigo
+            
+            # Obtener imagen del local (banner o primera foto)
+            local_imagen = None
+            if reserva.local and reserva.local.fotos:
+                # Intentar buscar banner
+                banner = next((f for f in reserva.local.fotos if f.id_tipo_foto == 1), None) # Asumiendo 1 es banner
+                if banner:
+                    local_imagen = banner.ruta
+                else:
+                    local_imagen = reserva.local.fotos[0].ruta
+            
+            # Obtener dirección
+            direccion_str = ""
+            if reserva.local and reserva.local.direccion:
+                d = reserva.local.direccion
+                direccion_str = f"{d.calle} {d.numero}"
+                
+            # Generar imagen QR si hay código
+            qr_base64 = None
+            if qr_codigo:
+                try:
+                    qr_data = {
+                        "tipo": "reserva",
+                        "codigo": qr_codigo,
+                        "reserva_id": reserva.id,
+                        "mesa_id": reserva.reservas_mesa[0].id_mesa if reserva.reservas_mesa else None,
+                        "local_id": reserva.id_local,
+                        "fecha": reserva.fecha_reserva.isoformat() if reserva.fecha_reserva else None,
+                        "hora": reserva.hora_reserva.strftime("%H:%M") if reserva.hora_reserva else None
+                    }
+                    qr_string = json.dumps(qr_data)
+                    qr_base64 = generar_qr_imagen(qr_string)
+                except Exception as e:
+                    print(f"Error generando QR para reserva {reserva.id}: {e}")
+
             reservas_lista.append({
                 'id': reserva.id,
                 'localId': str(reserva.id_local),
                 'localNombre': reserva.local.nombre if reserva.local else 'Local',
+                'localTipo': reserva.local.tipo_local.nombre if reserva.local and reserva.local.tipo_local else 'Restaurante',
+                'localImagen': local_imagen,
+                'localDireccion': direccion_str,
                 'fecha': reserva.fecha_reserva.strftime('%Y-%m-%d') if reserva.fecha_reserva else None,
                 'hora': reserva.hora_reserva.strftime('%H:%M') if reserva.hora_reserva else None,
                 'estado': reserva.estado.value if reserva.estado else 'pendiente',
-                'mesas': mesas_nombres
+                'mesas': mesas_nombres,
+                'codigoQR': qr_codigo or f"RES-{reserva.id}",
+                'qrImage': qr_base64
             })
         
         return jsonify({'reservas': reservas_lista}), 200

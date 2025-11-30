@@ -60,10 +60,10 @@ def obtener_locales():
             # Obtener imagen principal
             image = None
             if local.fotos:
-                # Buscar foto de tipo "banner" o "hero" o tomar la primera
+                # Buscar foto de tipo "banner" o tomar la primera disponible
                 foto_principal = next(
                     (f for f in local.fotos 
-                     if f.tipo_foto and f.tipo_foto.nombre in ['banner', 'hero', 'logo']), 
+                     if f.tipo_foto and f.tipo_foto.nombre == 'banner'), 
                     None
                 )
                 if foto_principal:
@@ -182,7 +182,8 @@ def obtener_local(id):
         # Obtener todas las fotos organizadas por tipo
         fotos_dict = {
             'banner': [],
-            'hero': [],
+            'capturas': [],
+            'hero': [], # Mantener vacío por compatibilidad
             'logo': None,
             'galeria': [],
             'todas': []
@@ -193,12 +194,16 @@ def obtener_local(id):
                 fotos_dict['todas'].append(foto.ruta)
                 if foto.tipo_foto:
                     tipo_nombre = foto.tipo_foto.nombre.lower()
-                    if tipo_nombre in ['banner', 'hero']:
-                        fotos_dict[tipo_nombre].append(foto.ruta)
-                    elif tipo_nombre == 'logo':
-                        fotos_dict['logo'] = foto.ruta
-                    else:
-                        fotos_dict['galeria'].append(foto.ruta)
+                    
+                    if tipo_nombre == 'banner':
+                        fotos_dict['banner'].append(foto.ruta)
+                    elif tipo_nombre == 'capturas':
+                        fotos_dict['capturas'].append(foto.ruta)
+                        fotos_dict['galeria'].append(foto.ruta) # Mapear capturas a galeria
+        
+        # Intentar asignar logo si hay capturas (fallback)
+        if fotos_dict['capturas']:
+            fotos_dict['logo'] = fotos_dict['capturas'][0]
         
         # Obtener redes sociales
         redes_sociales = []
@@ -378,6 +383,7 @@ def obtener_mesas_local(id):
             mesas_lista.append({
                 'id': str(mesa.id),
                 'nombre': mesa.nombre,
+                'descripcion': mesa.descripcion,
                 'capacidad': mesa.capacidad,
                 'estado': mesa.estado.value if mesa.estado else 'disponible'
             })
@@ -440,6 +446,165 @@ def obtener_reservas_local(id):
             'localId': str(id),
             'fecha': fecha_str,
             'reservas': reservas_lista
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@locales_bp.route('/<int:id>/horarios-disponibles', methods=['GET'])
+def obtener_horarios_disponibles(id):
+    """
+    Obtiene los horarios disponibles de un local para una fecha específica.
+    Si es el mismo día, retorna horarios con mínimo 2 horas desde la hora actual.
+    """
+    try:
+        # Verificar que el local existe
+        local = db_session.query(Local)\
+            .options(joinedload(Local.horarios))\
+            .filter(Local.id == id)\
+            .first()
+        
+        if not local:
+            return jsonify({"error": "Local no encontrado"}), 404
+        
+        # Parámetro de fecha (formato: YYYY-MM-DD)
+        fecha_str = request.args.get('fecha')
+        if not fecha_str:
+            return jsonify({"error": "Parámetro 'fecha' es requerido (formato: YYYY-MM-DD)"}), 400
+        
+        try:
+            fecha_seleccionada = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({"error": "Formato de fecha inválido. Use: YYYY-MM-DD"}), 400
+        
+        # Obtener el día de la semana (1=Lunes, 7=Domingo)
+        dia_semana = fecha_seleccionada.isoweekday()
+        
+        # Buscar horario del local para ese día
+        horario = next((h for h in local.horarios if h.dia_semana == dia_semana and h.abierto), None)
+        
+        if not horario:
+            return jsonify({
+                'localId': str(id),
+                'fecha': fecha_str,
+                'horarios': [],
+                'mensaje': 'El local está cerrado este día'
+            }), 200
+        
+        # Generar slots de tiempo cada 15 minutos desde apertura hasta 1 hora antes del cierre
+        def generar_slots(hora_inicio: time, hora_fin: time):
+            from datetime import timedelta
+            slots = []
+            hora_actual = datetime.combine(fecha_seleccionada, hora_inicio)
+            hora_final = datetime.combine(fecha_seleccionada, hora_fin)
+            
+            # Restar 1 hora al cierre para última reserva
+            hora_final = hora_final - timedelta(hours=1)
+            
+            while hora_actual < hora_final:
+                slots.append(hora_actual.strftime('%H:%M'))
+                hora_actual += timedelta(minutes=15)
+            
+            return slots
+        
+        slots_disponibles = generar_slots(horario.hora_apertura, horario.hora_cierre)
+        
+        # Si es el mismo día, filtrar horarios que sean al menos 2 horas desde ahora
+        from datetime import timedelta
+        ahora = datetime.now()
+        if fecha_seleccionada == ahora.date():
+            hora_minima = (ahora + timedelta(hours=2)).time()
+            slots_disponibles = [
+                slot for slot in slots_disponibles 
+                if datetime.strptime(slot, '%H:%M').time() >= hora_minima
+            ]
+        
+        return jsonify({
+            'localId': str(id),
+            'fecha': fecha_str,
+            'horarios': slots_disponibles
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@locales_bp.route('/<int:id>/mesas-disponibles', methods=['GET'])
+def obtener_mesas_disponibles(id):
+    """
+    Verifica la disponibilidad de mesas para una fecha y hora específica.
+    """
+    try:
+        from models import Reserva, ReservaMesa
+        
+        # Verificar que el local existe
+        local = db_session.query(Local).filter(Local.id == id).first()
+        if not local:
+            return jsonify({"error": "Local no encontrado"}), 404
+        
+        # Parámetros requeridos
+        fecha_str = request.args.get('fecha')
+        hora_str = request.args.get('hora')
+        
+        if not fecha_str or not hora_str:
+            return jsonify({"error": "Parámetros 'fecha' y 'hora' son requeridos"}), 400
+        
+        try:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            hora = datetime.strptime(hora_str, '%H:%M').time()
+        except ValueError:
+            return jsonify({"error": "Formato de fecha u hora inválido"}), 400
+        
+        # Obtener todas las mesas del local
+        mesas = db_session.query(Mesa)\
+            .filter(Mesa.id_local == id)\
+            .order_by(Mesa.nombre)\
+            .all()
+        
+        # Verificar disponibilidad de cada mesa
+        # Considerar un rango de ±2 horas
+        from datetime import timedelta
+        
+        hora_inicio = (datetime.combine(fecha, hora) - timedelta(hours=2)).time()
+        hora_fin = (datetime.combine(fecha, hora) + timedelta(hours=2)).time()
+        
+        # Obtener IDs de mesas ocupadas en ese rango
+        mesas_ocupadas = db_session.query(ReservaMesa.id_mesa)\
+            .join(Reserva)\
+            .filter(
+                Reserva.id_local == id,
+                Reserva.fecha_reserva == fecha,
+                Reserva.hora_reserva >= hora_inicio,
+                Reserva.hora_reserva <= hora_fin,
+                Reserva.estado.in_(['pendiente', 'confirmada'])
+            )\
+            .distinct()\
+            .all()
+        
+        mesas_ocupadas_ids = {mesa_id for (mesa_id,) in mesas_ocupadas}
+        
+        # Formatear respuesta con estado de disponibilidad
+        mesas_lista = []
+        for mesa in mesas:
+            esta_disponible = mesa.id not in mesas_ocupadas_ids
+            mesas_lista.append({
+                'id': str(mesa.id),
+                'nombre': mesa.nombre,
+                'descripcion': mesa.descripcion,
+                'capacidad': mesa.capacidad,
+                'estado': 'disponible' if esta_disponible else 'reservada'
+            })
+        
+        return jsonify({
+            'localId': str(id),
+            'fecha': fecha_str,
+            'hora': hora_str,
+            'mesas': mesas_lista
         }), 200
         
     except Exception as e:

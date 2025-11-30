@@ -1,5 +1,13 @@
 import sys
 import os
+import logging
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # --- CORRECCIÓN DE RUTAS ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -12,17 +20,17 @@ try:
     # Importamos los modelos
     from models import * # --- AQUÍ ESTABA EL ERROR (Debe haber un salto de línea) ---
     def init_db():
-        print(f"Iniciando creación de tablas en: {engine.url}")
+        logger.info(f"Iniciando creación de tablas en: {engine.url}")
         try:
             Base.metadata.create_all(bind=engine)
-            print("✅ ¡Tablas creadas exitosamente!")
+            logger.info("¡Tablas creadas exitosamente!")
         except Exception as e:
-            print(f"❌ Error fatal creando tablas: {e}")
+            logger.error(f"Error fatal creando tablas: {e}")
             sys.exit(1)
 
     if __name__ == "__main__":
         init_db()
 
 except ImportError as e:
-    print(f"❌ Error de importación (Rutas): {e}")
+    logger.error(f"Error de importación (Rutas): {e}")
     sys.exit(1)

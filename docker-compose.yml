@@ -22,7 +22,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: dockerfile.backend
     env_file:
       - .env
     environment:
@@ -44,7 +44,7 @@ services:
   init-db:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: dockerfile.backend
     command: bash scripts/init_db.sh
     env_file:
       - .env
@@ -67,7 +67,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: dockerfile.backend
     command: python src/main.py
     ports:
       - "5000:5000"
@@ -81,11 +81,31 @@ services:
       DB_PORT: 5432
       PYTHONPATH: /app/src
       TZ: America/Santiago
+      # Permitir CORS desde el frontend en Docker
+      ALLOWED_ORIGINS: "http://localhost:3000"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - .:/app
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
+      # Importante para que el hot-reload funcione bien en Windows/Docker
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

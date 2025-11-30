@@ -2,7 +2,7 @@
 
 Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de locales, pedidos y reservas.
 
-## Tabla de Contenidos
+## Tabla de Contenido
 
 - [Requisitos](#requisitos)
 - [Estructura del Proyecto](#estructura-del-proyecto)
@@ -42,7 +42,32 @@ DB_NAME=tu_bd
 POSTGRES_USER=tu_usuario
 POSTGRES_PASSWORD=tu_contraseña
 POSTGRES_DB=tu_bd
+
+# Configuración General
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 # Lista separada por comas
+ENV=development # 'production' o 'development'
 ```
+
+## Producción con Docker
+
+El proyecto incluye un `Dockerfile` optimizado para producción que utiliza **Gunicorn** como servidor WSGI.
+
+### Construir la imagen
+
+```bash
+docker build -t backend-restomap .
+```
+
+### Correr el contenedor
+
+```bash
+docker run -p 5000:5000 \
+  -e ALLOWED_ORIGINS=https://tu-frontend.run.app \
+  -e DATABASE_URL=postgresql://user:pass@host:5432/db \
+  backend-restomap
+```
+
+> **Nota:** En producción (GCP), no uses `docker-compose` para el despliegue del backend. Usa esta imagen individual conectada a una instancia de Cloud SQL.
 
 ## Uso con Docker
 

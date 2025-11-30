@@ -1,54 +1,21 @@
-# Entornos virtuales de Python
-.venv
-venv/
-ENV/
-env/
-
-# Archivos de Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
+__pycache__
+*.pyc
+*.pyo
+*.pyd
 .Python
-
-# Alembic
-alembic/versions/__pycache__/
-
-# Base de datos local
-*.db
-*.sqlite
-*.sqlite3
-
-# Variables de entorno
-.env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Git
-.git/
-.gitignore
-
-# Docker
-docker-compose.yml
-Dockerfile*
-
-# Documentación
-README.md
-
-# Scripts de inicialización
-scripts/
-
-# Logs
-*.log
-
-# Tests
-tests/
-.pytest_cache/
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
 .coverage
-htmlcov/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesisfs
