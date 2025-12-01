@@ -4,10 +4,12 @@ Endpoints para administrar mesas y productos de un local específico
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import joinedload
+from datetime import datetime
+import logging
+import bcrypt
 from database import db_session
 from models import Mesa, Producto, Local, Categoria, Usuario, Rol, EstadoMesaEnum, EstadoProductoEnum, Reserva, ReservaMesa, EstadoReservaEnum
 from utils.jwt_helper import requerir_auth
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -45,19 +47,39 @@ def obtener_estadisticas_dashboard(user_id, user_rol):
         ).count()
         
         # Contar mesas del local
+        from datetime import datetime, timedelta
+        
         total_mesas = db_session.query(Mesa).filter_by(id_local=id_local).count()
-        mesas_disponibles = db_session.query(Mesa).filter_by(
-            id_local=id_local,
-            estado=EstadoMesaEnum.DISPONIBLE
-        ).count()
+        
+        # Mesas físicamente ocupadas
         mesas_ocupadas = db_session.query(Mesa).filter_by(
             id_local=id_local,
             estado=EstadoMesaEnum.OCUPADA
         ).count()
-        mesas_reservadas = db_session.query(Mesa).filter_by(
-            id_local=id_local,
-            estado=EstadoMesaEnum.RESERVADA
-        ).count()
+        
+        # Calcular mesas reservadas dinámicamente (solo las que tienen reserva activa AHORA)
+        ahora = datetime.now()
+        fecha_hoy = ahora.date()
+        hora_inicio = (ahora - timedelta(minutes=30)).time()
+        hora_fin = (ahora + timedelta(hours=2)).time()
+        
+        mesas_reservadas = db_session.query(Mesa.id)\
+            .join(ReservaMesa)\
+            .join(Reserva)\
+            .filter(
+                Mesa.id_local == id_local,
+                Reserva.fecha_reserva == fecha_hoy,
+                Reserva.hora_reserva >= hora_inicio,
+                Reserva.hora_reserva <= hora_fin,
+                Reserva.estado.in_([EstadoReservaEnum.PENDIENTE, EstadoReservaEnum.CONFIRMADA]),
+                Mesa.estado != EstadoMesaEnum.OCUPADA,  # No contar las ya ocupadas
+                Mesa.estado != EstadoMesaEnum.FUERA_DE_SERVICIO
+            )\
+            .distinct()\
+            .count()
+        
+        # Mesas disponibles = total - ocupadas - reservadas activamente
+        mesas_disponibles = total_mesas - mesas_ocupadas - mesas_reservadas
         
         # Contar reservas del local
         total_reservas = db_session.query(Reserva).filter_by(id_local=id_local).count()
@@ -140,6 +162,126 @@ def obtener_personal(user_id, user_rol):
         logger.error(f"Error al obtener el personal: {e}")
         return jsonify({"error": "Error al obtener el personal"}), 500
 
+
+@gestionlocal_bp.route('/personal', methods=['POST'])
+@requerir_auth
+def crear_empleado(user_id, user_rol):
+    """
+    Crea un nuevo empleado vinculado al local del gerente
+    Solo accesible para usuarios con rol de gerente
+    POST /api/gestionlocal/personal
+    
+    Body:
+        {
+            "nombre": "Carlos Mesero",
+            "correo": "carlos@restaurante.cl",
+            "telefono": "+56912345678",
+            "contrasena": "password123",
+            "rol": "mesero"  // "chef", "mesero", "bartender"
+        }
+        
+    Response 201:
+        {
+            "success": true,
+            "message": "Empleado creado exitosamente",
+            "empleado": {
+                "id": 10,
+                "nombre": "Carlos Mesero",
+                "correo": "carlos@restaurante.cl",
+                "telefono": "+56912345678",
+                "rol": "mesero",
+                "id_local": 1
+            }
+        }
+        
+    Response 403:
+        {"error": "Solo gerentes pueden crear empleados"}
+    """
+    try:
+        # Verificar que el usuario tiene un local asignado Y es gerente
+        usuario = db_session.query(Usuario).options(joinedload(Usuario.rol)).filter_by(id=user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario sin local asignado"}), 403
+        
+        # Validar que el usuario sea gerente (id_rol = 2 o rol.nombre = 'gerente')
+        if not usuario.rol or usuario.rol.nombre != 'gerente':
+            return jsonify({"error": "Solo gerentes pueden crear empleados"}), 403
+        
+        id_local = usuario.id_local
+        
+        # Obtener datos del request
+        data = request.get_json()
+        
+        nombre = data.get('nombre')
+        correo = data.get('correo')
+        telefono = data.get('telefono')
+        contrasena = data.get('contrasena')
+        rol_nombre = data.get('rol', '').lower()
+        
+        # Validar campos requeridos
+        if not nombre or not correo or not contrasena or not rol_nombre:
+            return jsonify({"error": "Nombre, correo, contraseña y rol son requeridos"}), 400
+        
+        # Validar que el rol sea válido (solo operativos)
+        roles_permitidos = ['chef', 'mesero', 'bartender']
+        if rol_nombre not in roles_permitidos:
+            return jsonify({
+                "error": f"Rol inválido. Debe ser uno de: {', '.join(roles_permitidos)}"
+            }), 400
+        
+        # Verificar que el correo no esté registrado
+        usuario_existente = db_session.query(Usuario).filter_by(correo=correo).first()
+        if usuario_existente:
+            return jsonify({"error": "El correo ya está registrado"}), 400
+        
+        # Obtener el ID del rol
+        rol_map = {
+            'chef': 3,
+            'mesero': 4,
+            'bartender': 5
+        }
+        id_rol = rol_map.get(rol_nombre)
+        
+        # Encriptar contraseña
+        contrasena_hash = bcrypt.hashpw(contrasena.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Crear nuevo empleado
+        nuevo_empleado = Usuario(
+            nombre=nombre,
+            correo=correo,
+            telefono=telefono,
+            contrasena=contrasena_hash,
+            id_rol=id_rol,
+            id_local=id_local,  # Vincular al local del gerente
+            creado_el=datetime.utcnow()
+        )
+        
+        db_session.add(nuevo_empleado)
+        db_session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Empleado creado exitosamente",
+            "empleado": {
+                "id": nuevo_empleado.id,
+                "nombre": nuevo_empleado.nombre,
+                "correo": nuevo_empleado.correo,
+                "telefono": nuevo_empleado.telefono,
+                "rol": rol_nombre,
+                "id_local": id_local,
+                "fecha_registro": nuevo_empleado.creado_el.isoformat() if nuevo_empleado.creado_el else None
+            }
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error al crear empleado: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Error al crear el empleado", "detalle": str(e)}), 500
+
 # ============================================
 # ENDPOINTS DE CATEGORÍAS
 # ============================================
@@ -192,8 +334,13 @@ def obtener_mis_mesas(user_id, user_rol):
     GET /api/gestionlocal/mis-mesas
     
     Requiere que el usuario tenga id_local configurado
+    El estado de cada mesa se calcula dinámicamente basándose en:
+    - Estado base de la mesa (ocupada, fuera_de_servicio)
+    - Reservas activas que coincidan con la hora actual (±30 min)
     """
     try:
+        from datetime import datetime, timedelta, time
+        
         # Obtener el usuario para verificar su id_local
         usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
         
@@ -213,14 +360,53 @@ def obtener_mis_mesas(user_id, user_rol):
         # Obtener mesas del local
         mesas = db_session.query(Mesa).filter_by(id_local=id_local).all()
         
+        # Fecha y hora actual
+        ahora = datetime.now()
+        fecha_hoy = ahora.date()
+        hora_actual = ahora.time()
+        
+        # Rango de tolerancia: 30 minutos antes y 2 horas después
+        hora_inicio = (ahora - timedelta(minutes=30)).time()
+        hora_fin = (ahora + timedelta(hours=2)).time()
+        
+        # Obtener todas las reservas activas de hoy para este local
+        reservas_activas = db_session.query(ReservaMesa.id_mesa)\
+            .join(Reserva)\
+            .filter(
+                Reserva.id_local == id_local,
+                Reserva.fecha_reserva == fecha_hoy,
+                Reserva.hora_reserva >= hora_inicio,
+                Reserva.hora_reserva <= hora_fin,
+                Reserva.estado.in_([EstadoReservaEnum.PENDIENTE, EstadoReservaEnum.CONFIRMADA])
+            )\
+            .all()
+        
+        # Crear set de IDs de mesas con reservas activas
+        mesas_reservadas_ids = {r.id_mesa for r in reservas_activas}
+        
         resultado = []
         for mesa in mesas:
+            # Calcular estado dinámico
+            if mesa.estado == EstadoMesaEnum.OCUPADA:
+                # Si está ocupada físicamente, respeta ese estado
+                estado_actual = "ocupada"
+            elif mesa.estado == EstadoMesaEnum.FUERA_DE_SERVICIO:
+                # Si está fuera de servicio, respeta ese estado
+                estado_actual = "fuera_de_servicio"
+            elif mesa.id in mesas_reservadas_ids:
+                # Si tiene una reserva activa en este momento, mostrar como reservada
+                estado_actual = "reservada"
+            else:
+                # De lo contrario, está disponible
+                estado_actual = "disponible"
+            
             resultado.append({
                 "id": mesa.id,
                 "nombre": mesa.nombre,
                 "descripcion": mesa.descripcion,
                 "capacidad": mesa.capacidad,
-                "estado": mesa.estado.value if mesa.estado else None,
+                "estado": estado_actual,
+                "estado_base": mesa.estado.value if mesa.estado else None,  # Estado físico real
                 "id_local": mesa.id_local
             })
         

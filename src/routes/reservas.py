@@ -130,7 +130,7 @@ def crear_reserva(user_id, user_rol):
                 Reserva.fecha_reserva == fecha_reserva,
                 Reserva.hora_reserva >= hora_inicio,
                 Reserva.hora_reserva <= hora_fin,
-                Reserva.estado.in_(['pendiente', 'confirmada'])
+                Reserva.estado.in_([EstadoReservaEnum.PENDIENTE, EstadoReservaEnum.CONFIRMADA])
             )\
             .first()
         
