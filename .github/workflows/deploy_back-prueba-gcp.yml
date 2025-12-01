@@ -106,10 +106,18 @@ jobs:
 
     - name: 🚀 Deploy Cloud Run Service for Testing
       id: deploy
-      env:
-        DB_PASS: ${{ secrets.CI_DB_PASSWORD }} 
       run: |
-        # Usamos la variable de conexión de instancia de Cloud SQL (Unix Socket)
+        # 1. Creamos un archivo YAML temporal con las variables.
+        # Esto evita errores de sintaxis si la contraseña tiene comas o signos raros.
+        cat <<EOF > env_vars.yaml
+        ENV: development
+        DB_HOST: /cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }}
+        DB_USER: ${{ env.DB_USER }}
+        DB_NAME: ${{ env.DB_NAME }}
+        DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
+        EOF
+        
+        # 2. Desplegamos usando --env-vars-file
         gcloud run deploy ${SERVICE_NAME} \
           --image ${{ steps.build-push.outputs.image_uri }} \
           --region ${GCP_REGION} \
@@ -119,7 +127,7 @@ jobs:
           --memory 512Mi \
           --service-account 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com' \
           --add-cloudsql-instances "${{ env.SQL_INSTANCE_CONNECTION_NAME }}" \
-          --set-env-vars "ENV:development,DB_HOST=/cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }},DB_USER=${{ env.DB_USER }},DB_NAME=${{ env.DB_NAME }},DB_PASSWORD=${{ env.DB_PASS }}" \
+          --env-vars-file env_vars.yaml \
           --quiet
           
         SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${GCP_REGION} --format 'value(status.url)')
