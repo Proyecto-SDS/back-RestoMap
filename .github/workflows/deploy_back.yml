@@ -114,18 +114,31 @@ jobs:
         run: |
           echo "Ejecutando migraciones y seeds..."
 
-          # Obtener IP pública de Cloud SQL para conexión temporal
-          SQL_IP=$(gcloud sql instances describe ${SQL_INSTANCE_ID} --format="value(ipAddresses[0].ipAddress)")
+          # Descargar Cloud SQL Proxy
+          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+          chmod +x cloud_sql_proxy
 
-          # Ejecutar contenedor temporal con las migraciones
+          # Iniciar Cloud SQL Proxy en segundo plano
+          ./cloud_sql_proxy -instances=${PROJECT_ID}:${GCP_REGION}:${SQL_INSTANCE_ID}=tcp:5432 &
+          PROXY_PID=$!
+          
+          # Esperar a que el proxy esté listo
+          echo "Esperando a que Cloud SQL Proxy esté listo..."
+          sleep 10
+
+          # Ejecutar contenedor temporal con las migraciones (conectando a localhost:5432 a través del proxy)
           docker run --rm \
-            -e DB_HOST=$SQL_IP \
+            --network host \
+            -e DB_HOST=127.0.0.1 \
             -e DB_PORT=5432 \
             -e DB_USER=${DB_USER} \
             -e DB_NAME=${DB_NAME} \
             -e DB_PASSWORD=${DB_PASS} \
             ${{ env.MIGRATION_IMAGE }} \
             python -c "from database import Base, engine; from models import *; Base.metadata.create_all(bind=engine); print('✅ Tablas creadas'); from db.seed import seed_database; seed_database(); print('✅ Seeds ejecutados')"
+
+          # Detener Cloud SQL Proxy
+          kill $PROXY_PID
 
           echo "✅ Base de datos inicializada correctamente"
 
