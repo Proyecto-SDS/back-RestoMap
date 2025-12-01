@@ -1,0 +1,158 @@
+name: Despliegue entorno pruebas GCP back
+
+on:
+  # Permite la ejecución manual con inputs
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch a probar (ej: feat/bugfix-branch)'
+        required: true
+        default: 'develop'
+      duration_minutes:
+        description: 'Duración del servicio de pruebas (en minutos)'
+        required: false
+        default: 15
+        type: number
+
+env:
+  PROJECT_ID: restomap-478918
+  GCP_REGION: us-central1
+  REPO_NAME: repo
+  SERVICE_NAME: test-backend-${{ github.run_id }} # Nombre de servicio único
+  SQL_INSTANCE_ID: ci-sql-test-${{ github.run_id }} # Nombre de instancia SQL único
+  DB_USER: ci_user
+  DB_NAME: test_db_ci
+
+jobs:
+  deploy-backend-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: ⬇️ Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.branch }}
+
+    - name: 🔑 Autenticación con GCP (WIF)
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: 'projects/414435283954/locations/global/workloadIdentityPools/github-pool/providers/github-provider1'
+        service_account: 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com'
+        
+    - name: 🏗️ Setup Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    # --- 1. CREACIÓN DE CLOUD SQL TEMPORAL ---
+    # La contraseña se inyecta desde un Secret de GitHub
+    - name: 💾 Create Cloud SQL Test Instance
+      id: create_sql
+      run: |
+        echo "Iniciando creación de Cloud SQL: ${SQL_INSTANCE_ID}..."
+        gcloud sql instances create ${SQL_INSTANCE_ID} \
+          --database-version=POSTGRES_14 \
+          --tier=db-g1-small \
+          --region=${GCP_REGION} \
+          --storage-type=SSD \
+          --storage-auto-increase \
+          --root-password=${{ secrets.CI_DB_PASSWORD }} \
+          --async # Usamos async para no bloquear el runner
+        echo "SQL_INSTANCE_CONNECTION_NAME=${PROJECT_ID}:${GCP_REGION}:${SQL_INSTANCE_ID}" >> $GITHUB_ENV
+        
+    - name: ⏳ Wait for SQL Instance to be Ready # CORRECCIÓN: Script de polling en lugar de acción externa
+      run: |
+        echo "Waiting for SQL Instance to become RUNNABLE (Max 10 minutes)..."
+        MAX_RETRIES=60
+        RETRY_COUNT=0
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          STATUS=$(gcloud sql instances describe ${{ env.SQL_INSTANCE_ID }} --project=${{ env.PROJECT_ID }} --format="value(state)" 2>/dev/null)
+          
+          if [ "$STATUS" = "RUNNABLE" ]; then
+            echo "Instance is RUNNABLE."
+            exit 0
+          fi
+          
+          echo "Current status: $STATUS. Retrying in 10 seconds (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+          sleep 10
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+        done
+        
+        echo "Error: Cloud SQL instance did not become RUNNABLE within 10 minutes."
+        exit 1
+        
+    - name: ⚙️ Create Database and User
+      run: |
+        # Configurar la DB y el usuario de la aplicación.
+        # Esto requiere que la Service Account tenga 'Cloud SQL Client' y el DB tenga acceso.
+        gcloud sql users create ${DB_USER} \
+          --instance=${SQL_INSTANCE_ID} \
+          --password=${{ secrets.CI_DB_PASSWORD }} \
+          --host=%
+          
+        # Como es una instancia nueva, la DB 'postgres' ya existe.
+        # Aquí crearíamos la DB ${DB_NAME} si fuera necesario. 
+        # Para PostgreSQL, la DB se crea automáticamente en el paso siguiente 
+        # cuando se usa la conexión. Opcionalmente, se usa el comando sql-databases create.
+        gcloud sql databases create ${DB_NAME} --instance=${SQL_INSTANCE_ID}
+        
+    # --- 2. CONSTRUCCIÓN Y DESPLIEGUE ---
+    - name: 🔨 Build and Push Docker Image
+      id: build-push
+      run: |
+        gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev
+        IMAGE_URI=${GCP_REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest
+        docker build -f dockerfile.backend -t $IMAGE_URI .
+        docker push $IMAGE_URI
+        echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+    - name: 🚀 Deploy Cloud Run Service for Testing
+      id: deploy
+      env:
+        DB_PASS: ${{ secrets.CI_DB_PASSWORD }} 
+      run: |
+        # Usamos la variable de conexión de instancia de Cloud SQL (Unix Socket)
+        gcloud run deploy ${SERVICE_NAME} \
+          --image ${{ steps.build-push.outputs.image_uri }} \
+          --region ${GCP_REGION} \
+          --platform managed \
+          --allow-unauthenticated \
+          --cpu 1 \
+          --memory 512Mi \
+          --service-account 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com' \
+          --add-cloudsql-instances "${{ env.SQL_INSTANCE_CONNECTION_NAME }}" \
+          --set-env-vars "DB_HOST=/cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }},DB_USER=${{ env.DB_USER }},DB_NAME=${{ env.DB_NAME }},DB_PASSWORD=${{ env.DB_PASS }}" \
+          --quiet
+          
+        SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${GCP_REGION} --format 'value(status.url)')
+        echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+        echo "::notice title=Deployment Successful::🔗 URL de Pruebas: $SERVICE_URL"
+        
+    - name: ✅ Show Test URL
+      run: |
+        echo "### 🎉 Despliegue de Pruebas Listo"
+        echo "🔗 **URL de Pruebas:** [API Endpoint](${{ steps.deploy.outputs.service_url }})"
+        echo "---"
+        echo "Este servicio se eliminará en **${{ github.event.inputs.duration_minutes }}** minutos."
+
+    # --- 3. LIMPIEZA (CRUCIAL) ---
+    - name: ⏳ Wait and Cleanup Resources
+      if: always() # ¡Ejecutar SIEMPRE!
+      run: |
+        DURATION=${{ github.event.inputs.duration_minutes }}
+        if [ "$DURATION" -gt 0 ]; then
+          echo "Esperando ${DURATION} minutos..."
+          sleep $((${DURATION} * 60))
+        fi
+        
+        # ELIMINAR CLOUD RUN SERVICE
+        echo "Iniciando limpieza de Cloud Run..."
+        gcloud run services delete ${SERVICE_NAME} --region ${GCP_REGION} --quiet || true
+        echo "🗑️ Servicio de Cloud Run eliminado."
+
+        # ELIMINAR CLOUD SQL INSTANCE
+        echo "Iniciando limpieza de Cloud SQL..."
+        gcloud sql instances delete ${SQL_INSTANCE_ID} --quiet || true
+        echo "🗑️ Instancia de Cloud SQL eliminada."
