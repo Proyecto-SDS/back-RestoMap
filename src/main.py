@@ -1,10 +1,22 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request # <--- Agregamos request
 from flask_cors import CORS
-from database import db_session, engine, Base # <--- 1. IMPORTA ENGINE Y BASE
+from database import db_session, engine, Base
 import os
 import logging
 
 import models 
+
+# --- IMPORTACIÓN DEL SCRIPT DE SEEDS ---
+# Asumiendo que guardaste el script anterior como 'reboot_db.py'
+# Si lo guardaste como 'seeds.py', cambia a: from seeds import seed_database
+try:
+    from reboot_db import seed_database
+except ImportError:
+    # Si no encuentra el archivo, definimos una función dummy para que no rompa el servidor
+    logger = logging.getLogger(__name__)
+    logger.warning("⚠️ No se encontró el archivo 'reboot_db.py'. El endpoint de reset fallará.")
+    def seed_database():
+        raise Exception("El archivo reboot_db.py no existe o no se pudo importar.")
 
 # Configurar logging
 logging.basicConfig(
@@ -51,6 +63,38 @@ def create_app():
     def health_check():
         return jsonify({"status": "ok", "message": "Backend Flask funcionando correctamente"})
 
+    # ==================================================================
+    # ENDPOINT DE RESETEO TOTAL (Seed)
+    # ==================================================================
+    @app.route("/semilla/reset-total", methods=['POST', 'GET'])
+    def reset_db_endpoint():
+        # 1. SEGURIDAD: Verificar entorno y clave
+        env = os.environ.get("ENV", "production")
+        secret_key = request.args.get("key") # Se espera ?key=soyeljefe en la URL
+        
+        # Si es producción, OBLIGAMOS a tener la clave secreta
+        if env == "production" and secret_key != "soyeljefe":
+            return jsonify({
+                "error": "⛔ ACCESO DENEGADO",
+                "message": "No puedes resetear la base de datos de producción sin la clave maestra."
+            }), 403
+
+        try:
+            logger.warning(f"☢️ INICIANDO RESET DE BASE DE DATOS (Entorno: {env})")
+            
+            # Ejecutamos la función importada del script de seeds
+            seed_database()
+            
+            return jsonify({
+                "status": "success",
+                "message": "✅ Base de datos reiniciada y poblada exitosamente.",
+                "env": env
+            })
+        except Exception as e:
+            logger.error(f"❌ Error fatal en reset: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+    # ==================================================================
+
     # Registrar Blueprints (Rutas)
     from routes import locales_bp
     from routes.auth import auth_bp
@@ -76,6 +120,10 @@ if __name__ == "__main__":
     env = os.environ.get("ENV", "production")
     debug_mode = env in ["dev", "development"]
 
+    logger.info(f"Iniciando servidor en el puerto: {port}")
+    logger.info(f"Modo debug: {debug_mode} (ENV={env})")
+    # Ejecutar en modo debug si se corre directamente
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
     logger.info(f"Iniciando servidor en el puerto: {port}")
     logger.info(f"Modo debug: {debug_mode} (ENV={env})")
     # Ejecutar en modo debug si se corre directamente
