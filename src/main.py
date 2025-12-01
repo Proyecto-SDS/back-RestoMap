@@ -5,7 +5,7 @@ import os
 import logging
 import time
 
-# Importamos modelos para asegurar que SQLAlchemy los reconozca
+# Importamos modelos para asegurar que SQLAlchemy los reconozca al crear tablas
 import models
 from models import Local
 
@@ -16,7 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Intentar importar el script de seed de forma segura
+# --- IMPORTACIÓN SEGURA DEL SCRIPT DE SEED ---
+# Buscamos la función seed_database en tus archivos
 seed_database_func = None
 try:
     from reboot_db import seed_database
@@ -26,7 +27,7 @@ except ImportError:
         from seeds import seed_database
         seed_database_func = seed_database
     except ImportError:
-        logger.warning("⚠️ No se encontró el archivo de seeds.")
+        logger.warning("⚠️ No se encontró el archivo de seeds (reboot_db.py o seeds.py)")
 
 def create_app():
     app = Flask(__name__)
@@ -54,12 +55,16 @@ def create_app():
         return jsonify({"status": "ok", "message": "Backend funcionando"})
 
     # ====================================================================
-    # ENDPOINT PARA GITHUB ACTIONS (Este es el que llamará el YAML)
+    # NUEVO: ENDPOINT PARA GITHUB ACTIONS (AQUÍ ESTÁ LA SOLUCIÓN)
     # ====================================================================
     @app.route("/debug/force-seed", methods=['POST'])
     def force_seed_endpoint():
+        # Verificamos si logramos importar el script
         if not seed_database_func:
-            return jsonify({"error": "No se encontró función de seed"}), 500
+            return jsonify({
+                "error": "Script no encontrado", 
+                "message": "No existe reboot_db.py ni seeds.py en el servidor. Revisa que hayas subido el archivo."
+            }), 500
         
         try:
             logger.info("🌱 Ejecutando Seed a petición externa...")
@@ -70,10 +75,11 @@ def create_app():
             
             elapsed = time.time() - start_time
             logger.info(f"✅ Seed completado en {elapsed:.2f}s")
-            return jsonify({"status": "success", "message": "Base de datos poblada"})
+            return jsonify({"status": "success", "message": "Base de datos poblada correctamente"})
             
         except Exception as e:
             logger.error(f"❌ Error en seed: {e}")
+            # Devolvemos el error para que GitHub lo vea
             return jsonify({"error": str(e)}), 500
     # ====================================================================
 
