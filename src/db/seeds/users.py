@@ -38,12 +38,16 @@ def create_users(db):
         Usuario(id_rol=4, nombre="Carlos Mesero", correo="mesero@test.cl", 
                contrasena=password_hash, 
                telefono="944443333",
-               id_local=2),  # Bar La Terraza
+               id_local=1),  # El Gran Sabor
         Usuario(id_rol=5, nombre="Luis Bartender", correo="bartender@test.cl", 
                contrasena=password_hash, 
                telefono="922223333",
-               id_local=2),  # Bar La Terraza
+               id_local=1),  # El Gran Sabor
+        Usuario(id_rol=4, nombre="Laura Mesera", correo="mesera@test.cl", 
+               contrasena=password_hash, 
+               telefono="955554444",
+               id_local=1),  # El Gran Sabor
     ])
     db.commit()
     logger.info("    ✓ Usuarios insertados (password: test123)")
-    logger.info("    ℹ Empleados vinculados: Gerente y Chef → Local 1, Mesero y Bartender → Local 2")
+    logger.info("    ℹ Empleados vinculados: Local 1 (El Gran Sabor) tiene gerente, chef, meseros y bartender")

@@ -312,3 +312,176 @@ def obtener_mis_reservas(user_id, user_rol):
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Error al obtener las reservas'}), 500
+
+
+@reservas_bp.route('/local', methods=['GET'])
+@requerir_auth
+def obtener_reservas_local(user_id, user_rol):
+    """
+    Obtener todas las reservas del local vinculado al gerente
+    
+    Headers:
+        Authorization: Bearer {token}
+        
+    Response 200:
+        {
+            "reservas": [
+                {
+                    "id": 1,
+                    "clientName": "Juan Pérez",
+                    "clientEmail": "juan@test.cl",
+                    "date": "2024-11-25",
+                    "time": "19:30",
+                    "pax": 4,
+                    "status": "pendiente",
+                    "table": "Mesa 1",
+                    "requestDate": "Hace 2 horas"
+                }
+            ]
+        }
+        
+    Response 403:
+        {"error": "No tienes acceso a este recurso"}
+        
+    Response 404:
+        {"error": "Usuario no vinculado a ningún local"}
+    """
+    try:
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+            
+        if not usuario.id_local:
+            return jsonify({'error': 'Usuario no vinculado a ningún local'}), 404
+        
+        # Obtener todas las reservas del local
+        reservas = db_session.query(Reserva)\
+            .options(
+                joinedload(Reserva.usuario),
+                joinedload(Reserva.reservas_mesa).joinedload(ReservaMesa.mesa)
+            )\
+            .filter(Reserva.id_local == usuario.id_local)\
+            .order_by(Reserva.fecha_reserva.desc(), Reserva.hora_reserva.desc())\
+            .all()
+        
+        reservas_lista = []
+        for reserva in reservas:
+            # Obtener nombres de mesas
+            mesas_nombres = [rm.mesa.nombre for rm in reserva.reservas_mesa if rm.mesa]
+            mesa_str = ", ".join(mesas_nombres) if mesas_nombres else "Sin asignar"
+            
+            # Calcular número de personas basado en capacidad de mesas (aproximado)
+            total_personas = sum(rm.mesa.capacidad for rm in reserva.reservas_mesa if rm.mesa) if reserva.reservas_mesa else 2
+            
+            # Calcular tiempo desde la creación
+            tiempo_transcurrido = "Reciente"
+            if reserva.creado_el:
+                delta = datetime.now(reserva.creado_el.tzinfo) - reserva.creado_el
+                if delta.days > 0:
+                    tiempo_transcurrido = f"Hace {delta.days} día{'s' if delta.days > 1 else ''}"
+                elif delta.seconds // 3600 > 0:
+                    horas = delta.seconds // 3600
+                    tiempo_transcurrido = f"Hace {horas} hora{'s' if horas > 1 else ''}"
+                else:
+                    minutos = delta.seconds // 60
+                    tiempo_transcurrido = f"Hace {minutos} minuto{'s' if minutos > 1 else ''}"
+            
+            reservas_lista.append({
+                'id': str(reserva.id),
+                'clientName': reserva.usuario.nombre if reserva.usuario else 'Cliente Anónimo',
+                'clientEmail': reserva.usuario.correo if reserva.usuario else 'Sin email',
+                'date': reserva.fecha_reserva.strftime('%Y-%m-%d') if reserva.fecha_reserva else None,
+                'time': reserva.hora_reserva.strftime('%H:%M') if reserva.hora_reserva else None,
+                'pax': total_personas,
+                'status': reserva.estado.value if reserva.estado else 'pendiente',
+                'table': mesa_str,
+                'requestDate': tiempo_transcurrido
+            })
+        
+        return jsonify(reservas_lista), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Error al obtener las reservas del local'}), 500
+
+
+@reservas_bp.route('/<int:id_reserva>/estado', methods=['PUT'])
+@requerir_auth
+def actualizar_estado_reserva(user_id, user_rol, id_reserva):
+    """
+    Actualizar el estado de una reserva
+    
+    Headers:
+        Authorization: Bearer {token}
+        
+    Body:
+        {
+            "estado": "confirmada" | "cancelada" | "pendiente" | "completada"
+        }
+        
+    Response 200:
+        {
+            "success": true,
+            "message": "Estado de reserva actualizado",
+            "reserva": {
+                "id": 1,
+                "estado": "confirmada"
+            }
+        }
+        
+    Response 403:
+        {"error": "No tienes permiso para modificar esta reserva"}
+        
+    Response 404:
+        {"error": "Reserva no encontrada"}
+    """
+    try:
+        data = request.get_json()
+        nuevo_estado = data.get('estado', '').lower()
+        
+        # Mapeo de strings a valores del enum
+        estados_map = {
+            'pendiente': EstadoReservaEnum.PENDIENTE,
+            'confirmada': EstadoReservaEnum.CONFIRMADA,
+            'rechazada': EstadoReservaEnum.RECHAZADA
+        }
+        
+        # Validar estado
+        if nuevo_estado not in estados_map:
+            return jsonify({'error': f'Estado inválido. Debe ser uno de: {", ".join(estados_map.keys())}'}), 400
+        
+        # Obtener la reserva
+        reserva = db_session.query(Reserva).filter(Reserva.id == id_reserva).first()
+        
+        if not reserva:
+            return jsonify({'error': 'Reserva no encontrada'}), 404
+        
+        # Verificar que el usuario tenga acceso (debe ser del mismo local)
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario no vinculado a ningún local'}), 403
+            
+        if reserva.id_local != usuario.id_local:
+            return jsonify({'error': 'No tienes permiso para modificar esta reserva'}), 403
+        
+        # Actualizar estado usando el enum correcto
+        reserva.estado = estados_map[nuevo_estado]
+        db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Reserva actualizada a estado: {nuevo_estado}',
+            'reserva': {
+                'id': reserva.id,
+                'estado': reserva.estado.value
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        db_session.rollback()
+        return jsonify({'error': 'Error al actualizar el estado de la reserva'}), 500

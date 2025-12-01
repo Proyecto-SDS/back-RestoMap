@@ -5,7 +5,8 @@ Endpoints para administrar mesas y productos de un local específico
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import joinedload
 from database import db_session
-from models import Mesa, Producto, Local, Categoria, EstadoMesaEnum, EstadoProductoEnum
+from models import Mesa, Producto, Local, Categoria, Usuario, Rol, EstadoMesaEnum, EstadoProductoEnum, Reserva, ReservaMesa, EstadoReservaEnum
+from utils.jwt_helper import requerir_auth
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,17 +14,198 @@ logger = logging.getLogger(__name__)
 gestionlocal_bp = Blueprint('gestionlocal', __name__, url_prefix='/api/gestionlocal')
 
 # ============================================
-# ENDPOINTS DE MESAS
+# ENDPOINTS DE ESTADÍSTICAS DEL DASHBOARD
 # ============================================
 
-@gestionlocal_bp.route('/locales/<int:id_local>/mesas', methods=['GET'])
-def obtener_mesas_local(id_local):
+@gestionlocal_bp.route('/dashboard/stats', methods=['GET'])
+@requerir_auth
+def obtener_estadisticas_dashboard(user_id, user_rol):
     """
-    Obtiene todas las mesas de un local específico
-    GET /api/gestionlocal/locales/<id_local>/mesas
+    Obtiene estadísticas del dashboard para el local del usuario
+    GET /api/gestionlocal/dashboard/stats
     """
     try:
-        # Verificar que el local existe
+        # Obtener el local del usuario
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        
+        if not usuario or not usuario.id_local:
+            return jsonify({"error": "Usuario sin local asignado"}), 403
+        
+        id_local = usuario.id_local
+        
+        # Contar productos del local
+        total_productos = db_session.query(Producto).filter_by(id_local=id_local).count()
+        productos_disponibles = db_session.query(Producto).filter_by(
+            id_local=id_local,
+            estado=EstadoProductoEnum.DISPONIBLE
+        ).count()
+        productos_agotados = db_session.query(Producto).filter_by(
+            id_local=id_local,
+            estado=EstadoProductoEnum.AGOTADO
+        ).count()
+        
+        # Contar mesas del local
+        total_mesas = db_session.query(Mesa).filter_by(id_local=id_local).count()
+        mesas_disponibles = db_session.query(Mesa).filter_by(
+            id_local=id_local,
+            estado=EstadoMesaEnum.DISPONIBLE
+        ).count()
+        mesas_ocupadas = db_session.query(Mesa).filter_by(
+            id_local=id_local,
+            estado=EstadoMesaEnum.OCUPADA
+        ).count()
+        mesas_reservadas = db_session.query(Mesa).filter_by(
+            id_local=id_local,
+            estado=EstadoMesaEnum.RESERVADA
+        ).count()
+        
+        # Contar reservas del local
+        total_reservas = db_session.query(Reserva).filter_by(id_local=id_local).count()
+        reservas_pendientes = db_session.query(Reserva).filter_by(
+            id_local=id_local,
+            estado=EstadoReservaEnum.PENDIENTE
+        ).count()
+        reservas_confirmadas = db_session.query(Reserva).filter_by(
+            id_local=id_local,
+            estado=EstadoReservaEnum.CONFIRMADA
+        ).count()
+        
+        return jsonify({
+            "productos": {
+                "total": total_productos,
+                "disponibles": productos_disponibles,
+                "agotados": productos_agotados
+            },
+            "mesas": {
+                "total": total_mesas,
+                "disponibles": mesas_disponibles,
+                "ocupadas": mesas_ocupadas,
+                "reservadas": mesas_reservadas
+            },
+            "reservas": {
+                "total": total_reservas,
+                "pendientes": reservas_pendientes,
+                "confirmadas": reservas_confirmadas
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error al obtener estadísticas del dashboard: {e}")
+        return jsonify({"error": "Error al obtener las estadísticas"}), 500
+
+# ============================================
+# ENDPOINTS DE PERSONAL
+# ============================================
+
+@gestionlocal_bp.route('/personal', methods=['GET'])
+@requerir_auth
+def obtener_personal(user_id, user_rol):
+    """
+    Obtiene el personal del local (bartenders, meseros y chefs - excluye gerentes y clientes)
+    GET /api/gestionlocal/personal
+    """
+    try:
+        # Obtener el local del usuario
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        
+        if not usuario or not usuario.id_local:
+            return jsonify({"error": "Usuario sin local asignado"}), 403
+        
+        id_local = usuario.id_local
+        
+        # Obtener solo bartenders, meseros y chefs del local
+        # Excluimos gerentes y clientes
+        personal = db_session.query(Usuario).join(Rol).filter(
+            Usuario.id_local == id_local,
+            Rol.nombre.in_(['bartender', 'mesero', 'chef'])
+        ).all()
+        
+        resultado = []
+        for empleado in personal:
+            resultado.append({
+                "id": empleado.id,
+                "nombre": empleado.nombre,
+                "correo": empleado.correo,
+                "telefono": empleado.telefono,
+                "rol": empleado.rol.nombre if empleado.rol else "Sin rol",
+                "fecha_registro": empleado.creado_el.isoformat() if empleado.creado_el else None
+            })
+        
+        return jsonify({
+            "personal": resultado,
+            "total": len(resultado)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error al obtener el personal: {e}")
+        return jsonify({"error": "Error al obtener el personal"}), 500
+
+# ============================================
+# ENDPOINTS DE CATEGORÍAS
+# ============================================
+
+@gestionlocal_bp.route('/categorias', methods=['GET'])
+def obtener_categorias():
+    """
+    Obtiene todas las categorías disponibles
+    GET /api/gestionlocal/categorias
+    """
+    try:
+        categorias = db_session.query(Categoria).all()
+        
+        resultado = []
+        for cat in categorias:
+            resultado.append({
+                "id": cat.id,
+                "nombre": cat.nombre
+            })
+        
+        return jsonify({
+            "categorias": resultado,
+            "total": len(resultado)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error al obtener categorías: {e}")
+        return jsonify({"error": "Error al obtener las categorías"}), 500
+
+
+
+# ============================================
+# MANEJO DE ERRORES
+# ============================================
+
+@gestionlocal_bp.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Recurso no encontrado"}), 404
+
+
+# ============================================
+# ENDPOINTS PARA GERENTES (usa id_local del usuario)
+# ============================================
+
+@gestionlocal_bp.route('/mis-mesas', methods=['GET'])
+@requerir_auth
+def obtener_mis_mesas(user_id, user_rol):
+    """
+    Obtiene todas las mesas del local vinculado al usuario autenticado
+    GET /api/gestionlocal/mis-mesas
+    
+    Requiere que el usuario tenga id_local configurado
+    """
+    try:
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
+        
+        # Obtener el local
         local = db_session.query(Local).filter_by(id=id_local).first()
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
@@ -50,54 +232,67 @@ def obtener_mesas_local(id_local):
         }), 200
         
     except Exception as e:
-        logger.error(f"Error al obtener mesas del local {id_local}: {e}")
-        db_session.rollback()
+        logger.error(f"Error al obtener mesas del usuario {user_id}: {e}")
         return jsonify({"error": "Error al obtener las mesas", "detalle": str(e)}), 500
 
 
-@gestionlocal_bp.route('/locales/<int:id_local>/mesas', methods=['POST'])
-def crear_mesa_local(id_local):
+@gestionlocal_bp.route('/mis-mesas', methods=['POST'])
+@requerir_auth
+def crear_mi_mesa(user_id, user_rol):
     """
-    Crea una nueva mesa para un local específico
-    POST /api/gestionlocal/locales/<id_local>/mesas
-    Body: {
-        "nombre": "Mesa 1",
-        "descripcion": "Mesa junto a la ventana",
-        "capacidad": 4,
-        "estado": "disponible"  // opcional, por defecto "disponible"
-    }
+    Crea una nueva mesa en el local vinculado al usuario autenticado
+    POST /api/gestionlocal/mis-mesas
+    
+    Body:
+        {
+            "nombre": "Mesa 11",
+            "capacidad": 6,
+            "estado": "disponible"
+        }
     """
     try:
-        # Verificar que el local existe
-        local = db_session.query(Local).filter_by(id=id_local).first()
-        if not local:
-            return jsonify({"error": "Local no encontrado"}), 404
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
         
         data = request.get_json()
         
-        # Validaciones
-        if not data.get('nombre'):
-            return jsonify({"error": "El nombre de la mesa es obligatorio"}), 400
+        # Validar campos requeridos
+        if 'nombre' not in data or not data['nombre']:
+            return jsonify({"error": "El nombre es requerido"}), 400
         
-        if not data.get('capacidad') or data.get('capacidad') <= 0:
-            return jsonify({"error": "La capacidad debe ser un número mayor a 0"}), 400
+        if 'capacidad' not in data:
+            return jsonify({"error": "La capacidad es requerida"}), 400
         
-        # Validar estado si se proporciona
-        estado = data.get('estado', 'disponible')
-        try:
-            estado_enum = EstadoMesaEnum(estado)
-        except ValueError:
-            return jsonify({
-                "error": f"Estado inválido. Valores permitidos: {[e.value for e in EstadoMesaEnum]}"
-            }), 400
+        capacidad = int(data['capacidad'])
+        if capacidad < 1:
+            return jsonify({"error": "La capacidad debe ser al menos 1"}), 400
         
-        # Crear nueva mesa
+        # Validar estado
+        estado_str = data.get('estado', 'disponible').lower()
+        estados_map = {
+            'disponible': EstadoMesaEnum.DISPONIBLE,
+            'ocupada': EstadoMesaEnum.OCUPADA,
+            'reservada': EstadoMesaEnum.RESERVADA,
+            'fuera_de_servicio': EstadoMesaEnum.FUERA_DE_SERVICIO
+        }
+        
+        if estado_str not in estados_map:
+            return jsonify({"error": f"Estado inválido. Debe ser uno de: {', '.join(estados_map.keys())}"}), 400
+        
+        # Crear la mesa
         nueva_mesa = Mesa(
-            id_local=id_local,
             nombre=data['nombre'],
-            descripcion=data.get('descripcion'),
-            capacidad=data['capacidad'],
-            estado=estado_enum
+            capacidad=capacidad,
+            estado=estados_map[estado_str],
+            id_local=id_local
         )
         
         db_session.add(nueva_mesa)
@@ -109,143 +304,65 @@ def crear_mesa_local(id_local):
             "mesa": {
                 "id": nueva_mesa.id,
                 "nombre": nueva_mesa.nombre,
-                "descripcion": nueva_mesa.descripcion,
                 "capacidad": nueva_mesa.capacidad,
-                "estado": nueva_mesa.estado.value,
+                "estado": nueva_mesa.estado.value if nueva_mesa.estado else None,
                 "id_local": nueva_mesa.id_local
             }
         }), 201
         
+    except ValueError as e:
+        logger.error(f"Error de validación al crear mesa: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Datos inválidos", "detalle": str(e)}), 400
     except Exception as e:
-        logger.error(f"Error al crear mesa en local {id_local}: {e}")
+        logger.error(f"Error al crear mesa: {e}")
         db_session.rollback()
         return jsonify({"error": "Error al crear la mesa", "detalle": str(e)}), 500
 
 
-@gestionlocal_bp.route('/locales/<int:id_local>/mesas/<int:id_mesa>', methods=['PUT'])
-def editar_mesa_local(id_local, id_mesa):
+@gestionlocal_bp.route('/mis-productos', methods=['GET'])
+@requerir_auth
+def obtener_mis_productos(user_id, user_rol):
     """
-    Edita una mesa de un local específico
-    PUT /api/gestionlocal/locales/<id_local>/mesas/<id_mesa>
-    Body: {
-        "nombre": "Mesa VIP 1",  // opcional
-        "descripcion": "Mesa premium junto a la ventana",  // opcional
-        "capacidad": 6,  // opcional
-        "estado": "ocupada"  // opcional
-    }
+    Obtiene todos los productos del local vinculado al usuario autenticado
+    GET /api/gestionlocal/mis-productos
+    
+    Requiere que el usuario tenga id_local configurado
     """
     try:
-        # Verificar que la mesa existe y pertenece al local
-        mesa = db_session.query(Mesa).filter_by(id=id_mesa, id_local=id_local).first()
-        if not mesa:
-            return jsonify({"error": "Mesa no encontrada en este local"}), 404
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
         
-        data = request.get_json()
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
         
-        # Actualizar campos proporcionados
-        if 'nombre' in data:
-            if not data['nombre']:
-                return jsonify({"error": "El nombre no puede estar vacío"}), 400
-            mesa.nombre = data['nombre']
+        id_local = usuario.id_local
         
-        if 'descripcion' in data:
-            mesa.descripcion = data['descripcion']
-        
-        if 'capacidad' in data:
-            if data['capacidad'] <= 0:
-                return jsonify({"error": "La capacidad debe ser mayor a 0"}), 400
-            mesa.capacidad = data['capacidad']
-        
-        if 'estado' in data:
-            try:
-                estado_enum = EstadoMesaEnum(data['estado'])
-                mesa.estado = estado_enum
-            except ValueError:
-                return jsonify({
-                    "error": f"Estado inválido. Valores permitidos: {[e.value for e in EstadoMesaEnum]}"
-                }), 400
-        
-        db_session.commit()
-        db_session.refresh(mesa)
-        
-        return jsonify({
-            "mensaje": "Mesa actualizada exitosamente",
-            "mesa": {
-                "id": mesa.id,
-                "nombre": mesa.nombre,
-                "descripcion": mesa.descripcion,
-                "capacidad": mesa.capacidad,
-                "estado": mesa.estado.value,
-                "id_local": mesa.id_local
-            }
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Error al editar mesa {id_mesa} del local {id_local}: {e}")
-        db_session.rollback()
-        return jsonify({"error": "Error al actualizar la mesa", "detalle": str(e)}), 500
-
-
-@gestionlocal_bp.route('/locales/<int:id_local>/mesas/<int:id_mesa>', methods=['DELETE'])
-def eliminar_mesa_local(id_local, id_mesa):
-    """
-    Elimina una mesa de un local específico
-    DELETE /api/gestionlocal/locales/<id_local>/mesas/<id_mesa>
-    """
-    try:
-        # Verificar que la mesa existe y pertenece al local
-        mesa = db_session.query(Mesa).filter_by(id=id_mesa, id_local=id_local).first()
-        if not mesa:
-            return jsonify({"error": "Mesa no encontrada en este local"}), 404
-        
-        nombre_mesa = mesa.nombre
-        
-        db_session.delete(mesa)
-        db_session.commit()
-        
-        return jsonify({
-            "mensaje": f"Mesa '{nombre_mesa}' eliminada exitosamente",
-            "id_mesa": id_mesa
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Error al eliminar mesa {id_mesa} del local {id_local}: {e}")
-        db_session.rollback()
-        return jsonify({"error": "Error al eliminar la mesa", "detalle": str(e)}), 500
-
-
-# ============================================
-# ENDPOINTS DE PRODUCTOS
-# ============================================
-
-@gestionlocal_bp.route('/locales/<int:id_local>/productos', methods=['GET'])
-def obtener_productos_local(id_local):
-    """
-    Obtiene todos los productos de un local específico
-    GET /api/gestionlocal/locales/<id_local>/productos
-    """
-    try:
-        # Verificar que el local existe
+        # Obtener el local
         local = db_session.query(Local).filter_by(id=id_local).first()
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
         
-        # Obtener productos del local con su categoría
+        # Obtener productos del local con categoría
         productos = db_session.query(Producto)\
             .options(joinedload(Producto.categoria))\
-            .filter_by(id_local=id_local).all()
+            .filter_by(id_local=id_local)\
+            .all()
         
         resultado = []
-        for producto in productos:
+        for prod in productos:
             resultado.append({
-                "id": producto.id,
-                "nombre": producto.nombre,
-                "descripcion": producto.descripcion,
-                "precio": producto.precio,
-                "estado": producto.estado.value if producto.estado else None,
-                "id_local": producto.id_local,
-                "id_categoria": producto.id_categoria,
-                "categoria": producto.categoria.nombre if producto.categoria else None
+                "id": prod.id,
+                "nombre": prod.nombre,
+                "descripcion": prod.descripcion,
+                "precio": float(prod.precio) if prod.precio else 0.0,
+                "estado": prod.estado.value if prod.estado else None,
+                "id_local": prod.id_local,
+                "id_categoria": prod.id_categoria,
+                "categoria_nombre": prod.categoria.nombre if prod.categoria else None
             })
         
         return jsonify({
@@ -256,62 +373,77 @@ def obtener_productos_local(id_local):
         }), 200
         
     except Exception as e:
-        logger.error(f"Error al obtener productos del local {id_local}: {e}")
-        db_session.rollback()
+        logger.error(f"Error al obtener productos del usuario {user_id}: {e}")
         return jsonify({"error": "Error al obtener los productos", "detalle": str(e)}), 500
 
 
-@gestionlocal_bp.route('/locales/<int:id_local>/productos', methods=['POST'])
-def crear_producto_local(id_local):
+@gestionlocal_bp.route('/mis-productos', methods=['POST'])
+@requerir_auth
+def crear_mi_producto(user_id, user_rol):
     """
-    Crea un nuevo producto para un local específico
-    POST /api/gestionlocal/locales/<id_local>/productos
-    Body: {
-        "nombre": "Hamburguesa Clásica",
-        "descripcion": "Hamburguesa con carne, lechuga, tomate y queso",
-        "precio": 8500,
-        "id_categoria": 2,  // opcional
-        "estado": "disponible"  // opcional, por defecto "disponible"
-    }
+    Crea un nuevo producto en el local vinculado al usuario autenticado
+    POST /api/gestionlocal/mis-productos
+    
+    Body:
+        {
+            "nombre": "Pizza Napolitana",
+            "descripcion": "Pizza con tomate, mozzarella y albahaca",
+            "precio": 8500,
+            "estado": "disponible",
+            "id_categoria": 2
+        }
     """
     try:
-        # Verificar que el local existe
-        local = db_session.query(Local).filter_by(id=id_local).first()
-        if not local:
-            return jsonify({"error": "Local no encontrado"}), 404
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
         
         data = request.get_json()
         
-        # Validaciones
-        if not data.get('nombre'):
-            return jsonify({"error": "El nombre del producto es obligatorio"}), 400
+        # Validar campos requeridos
+        if 'nombre' not in data or not data['nombre']:
+            return jsonify({"error": "El nombre es requerido"}), 400
         
-        if not data.get('precio') or data.get('precio') < 0:
-            return jsonify({"error": "El precio debe ser un número mayor o igual a 0"}), 400
+        if 'precio' not in data:
+            return jsonify({"error": "El precio es requerido"}), 400
+        
+        precio = float(data['precio'])
+        if precio < 0:
+            return jsonify({"error": "El precio debe ser mayor o igual a 0"}), 400
         
         # Validar categoría si se proporciona
-        if data.get('id_categoria'):
-            categoria = db_session.query(Categoria).filter_by(id=data['id_categoria']).first()
+        id_categoria = data.get('id_categoria')
+        if id_categoria:
+            categoria = db_session.query(Categoria).filter_by(id=id_categoria).first()
             if not categoria:
                 return jsonify({"error": "Categoría no encontrada"}), 404
         
-        # Validar estado si se proporciona
-        estado = data.get('estado', 'disponible')
-        try:
-            estado_enum = EstadoProductoEnum(estado)
-        except ValueError:
-            return jsonify({
-                "error": f"Estado inválido. Valores permitidos: {[e.value for e in EstadoProductoEnum]}"
-            }), 400
+        # Validar estado
+        estado_str = data.get('estado', 'disponible').lower()
+        estados_map = {
+            'disponible': EstadoProductoEnum.DISPONIBLE,
+            'agotado': EstadoProductoEnum.AGOTADO,
+            'inactivo': EstadoProductoEnum.INACTIVO
+        }
         
-        # Crear nuevo producto
+        if estado_str not in estados_map:
+            return jsonify({"error": f"Estado inválido. Debe ser uno de: {', '.join(estados_map.keys())}"}), 400
+        
+        # Crear el producto
         nuevo_producto = Producto(
-            id_local=id_local,
             nombre=data['nombre'],
-            descripcion=data.get('descripcion'),
-            precio=data['precio'],
-            id_categoria=data.get('id_categoria'),
-            estado=estado_enum
+            descripcion=data.get('descripcion', ''),
+            precio=precio,
+            estado=estados_map[estado_str],
+            id_local=id_local,
+            id_categoria=id_categoria
         )
         
         db_session.add(nuevo_producto)
@@ -325,41 +457,59 @@ def crear_producto_local(id_local):
                 "nombre": nuevo_producto.nombre,
                 "descripcion": nuevo_producto.descripcion,
                 "precio": nuevo_producto.precio,
-                "estado": nuevo_producto.estado.value,
+                "estado": nuevo_producto.estado.value if nuevo_producto.estado else None,
                 "id_local": nuevo_producto.id_local,
                 "id_categoria": nuevo_producto.id_categoria,
-                "categoria": nuevo_producto.categoria.nombre if nuevo_producto.categoria else None
+                "categoria_nombre": nuevo_producto.categoria.nombre if nuevo_producto.categoria else None
             }
         }), 201
         
+    except ValueError as e:
+        logger.error(f"Error de validación al crear producto: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Datos inválidos", "detalle": str(e)}), 400
     except Exception as e:
-        logger.error(f"Error al crear producto en local {id_local}: {e}")
+        logger.error(f"Error al crear producto: {e}")
         db_session.rollback()
         return jsonify({"error": "Error al crear el producto", "detalle": str(e)}), 500
 
 
-@gestionlocal_bp.route('/locales/<int:id_local>/productos/<int:id_producto>', methods=['PUT'])
-def editar_producto_local(id_local, id_producto):
+@gestionlocal_bp.route('/mis-productos/<int:id_producto>', methods=['PUT'])
+@requerir_auth
+def actualizar_mi_producto(user_id, user_rol, id_producto):
     """
-    Edita un producto de un local específico
-    PUT /api/gestionlocal/locales/<id_local>/productos/<id_producto>
-    Body: {
-        "nombre": "Hamburguesa Premium",  // opcional
-        "descripcion": "Hamburguesa gourmet con carne angus",  // opcional
-        "precio": 12500,  // opcional
-        "estado": "agotado",  // opcional
-        "id_categoria": 3  // opcional
-    }
+    Actualiza un producto del local vinculado al usuario autenticado
+    PUT /api/gestionlocal/mis-productos/<id_producto>
+    
+    Body:
+        {
+            "nombre": "Lomo a lo Pobre Premium",
+            "descripcion": "Descripción actualizada",
+            "precio": 15000,
+            "estado": "disponible" | "agotado" | "inactivo",
+            "id_categoria": 2
+        }
     """
     try:
-        # Verificar que el producto existe y pertenece al local
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
+        
+        # Verificar que el producto existe y pertenece al local del usuario
         producto = db_session.query(Producto).filter_by(id=id_producto, id_local=id_local).first()
         if not producto:
-            return jsonify({"error": "Producto no encontrado en este local"}), 404
+            return jsonify({"error": "Producto no encontrado en tu local"}), 404
         
         data = request.get_json()
         
-        # Actualizar campos proporcionados
+        # Actualizar campos si se proporcionan
         if 'nombre' in data:
             if not data['nombre']:
                 return jsonify({"error": "El nombre no puede estar vacío"}), 400
@@ -369,9 +519,10 @@ def editar_producto_local(id_local, id_producto):
             producto.descripcion = data['descripcion']
         
         if 'precio' in data:
-            if data['precio'] < 0:
+            precio = float(data['precio'])
+            if precio < 0:
                 return jsonify({"error": "El precio debe ser mayor o igual a 0"}), 400
-            producto.precio = data['precio']
+            producto.precio = precio
         
         if 'id_categoria' in data:
             if data['id_categoria'] is not None:
@@ -381,13 +532,19 @@ def editar_producto_local(id_local, id_producto):
             producto.id_categoria = data['id_categoria']
         
         if 'estado' in data:
-            try:
-                estado_enum = EstadoProductoEnum(data['estado'])
-                producto.estado = estado_enum
-            except ValueError:
-                return jsonify({
-                    "error": f"Estado inválido. Valores permitidos: {[e.value for e in EstadoProductoEnum]}"
-                }), 400
+            estado_str = data['estado'].lower()
+            
+            # Mapeo de strings a valores del enum
+            estados_map = {
+                'disponible': EstadoProductoEnum.DISPONIBLE,
+                'agotado': EstadoProductoEnum.AGOTADO,
+                'inactivo': EstadoProductoEnum.INACTIVO
+            }
+            
+            if estado_str not in estados_map:
+                return jsonify({"error": f"Estado inválido. Debe ser uno de: {', '.join(estados_map.keys())}"}), 400
+            
+            producto.estado = estados_map[estado_str]
         
         db_session.commit()
         db_session.refresh(producto)
@@ -399,54 +556,203 @@ def editar_producto_local(id_local, id_producto):
                 "nombre": producto.nombre,
                 "descripcion": producto.descripcion,
                 "precio": producto.precio,
-                "estado": producto.estado.value,
+                "estado": producto.estado.value if producto.estado else None,
                 "id_local": producto.id_local,
                 "id_categoria": producto.id_categoria,
-                "categoria": producto.categoria.nombre if producto.categoria else None
+                "categoria_nombre": producto.categoria.nombre if producto.categoria else None
             }
         }), 200
         
+    except ValueError as e:
+        logger.error(f"Error de validación al actualizar producto {id_producto}: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Datos inválidos", "detalle": str(e)}), 400
     except Exception as e:
-        logger.error(f"Error al editar producto {id_producto} del local {id_local}: {e}")
+        logger.error(f"Error al actualizar producto {id_producto}: {e}")
         db_session.rollback()
         return jsonify({"error": "Error al actualizar el producto", "detalle": str(e)}), 500
 
 
-@gestionlocal_bp.route('/locales/<int:id_local>/productos/<int:id_producto>', methods=['DELETE'])
-def eliminar_producto_local(id_local, id_producto):
+@gestionlocal_bp.route('/mis-productos/<int:id_producto>', methods=['DELETE'])
+@requerir_auth
+def eliminar_mi_producto(user_id, user_rol, id_producto):
     """
-    Elimina un producto de un local específico
-    DELETE /api/gestionlocal/locales/<id_local>/productos/<id_producto>
+    Elimina un producto del local vinculado al usuario autenticado
+    DELETE /api/gestionlocal/mis-productos/<id_producto>
     """
     try:
-        # Verificar que el producto existe y pertenece al local
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
+        
+        # Verificar que el producto existe y pertenece al local del usuario
         producto = db_session.query(Producto).filter_by(id=id_producto, id_local=id_local).first()
         if not producto:
-            return jsonify({"error": "Producto no encontrado en este local"}), 404
+            return jsonify({"error": "Producto no encontrado en tu local"}), 404
         
-        nombre_producto = producto.nombre
+        # Guardar información antes de eliminar
+        producto_info = {
+            "id": producto.id,
+            "nombre": producto.nombre
+        }
         
         db_session.delete(producto)
         db_session.commit()
         
         return jsonify({
-            "mensaje": f"Producto '{nombre_producto}' eliminado exitosamente",
-            "id_producto": id_producto
+            "mensaje": "Producto eliminado exitosamente",
+            "producto": producto_info
         }), 200
         
     except Exception as e:
-        logger.error(f"Error al eliminar producto {id_producto} del local {id_local}: {e}")
+        logger.error(f"Error al eliminar producto {id_producto}: {e}")
         db_session.rollback()
         return jsonify({"error": "Error al eliminar el producto", "detalle": str(e)}), 500
 
 
-# ============================================
-# MANEJO DE ERRORES
-# ============================================
+@gestionlocal_bp.route('/mis-mesas/<int:id_mesa>', methods=['PUT'])
+@requerir_auth
+def actualizar_mi_mesa(user_id, user_rol, id_mesa):
+    """
+    Actualiza una mesa del local vinculado al usuario autenticado
+    PUT /api/gestionlocal/mis-mesas/<id_mesa>
+    
+    Body:
+        {
+            "nombre": "Mesa 1",
+            "capacidad": 4,
+            "estado": "disponible" | "ocupada" | "reservada" | "fuera_de_servicio"
+        }
+    """
+    try:
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
+        
+        # Verificar que la mesa existe y pertenece al local del usuario
+        mesa = db_session.query(Mesa).filter_by(id=id_mesa, id_local=id_local).first()
+        if not mesa:
+            return jsonify({"error": "Mesa no encontrada en tu local"}), 404
+        
+        data = request.get_json()
+        
+        # Actualizar campos si se proporcionan
+        if 'nombre' in data:
+            mesa.nombre = data['nombre']
+        
+        if 'capacidad' in data:
+            capacidad = int(data['capacidad'])
+            if capacidad < 1:
+                return jsonify({"error": "La capacidad debe ser al menos 1"}), 400
+            mesa.capacidad = capacidad
+        
+        if 'estado' in data:
+            estado_str = data['estado'].lower()
+            
+            # Mapeo de strings a valores del enum
+            estados_map = {
+                'disponible': EstadoMesaEnum.DISPONIBLE,
+                'ocupada': EstadoMesaEnum.OCUPADA,
+                'reservada': EstadoMesaEnum.RESERVADA,
+                'fuera_de_servicio': EstadoMesaEnum.FUERA_DE_SERVICIO
+            }
+            
+            if estado_str not in estados_map:
+                return jsonify({"error": f"Estado inválido. Debe ser uno de: {', '.join(estados_map.keys())}"}), 400
+            
+            mesa.estado = estados_map[estado_str]
+        
+        db_session.commit()
+        
+        return jsonify({
+            "mensaje": "Mesa actualizada exitosamente",
+            "mesa": {
+                "id": mesa.id,
+                "nombre": mesa.nombre,
+                "capacidad": mesa.capacidad,
+                "estado": mesa.estado.value if mesa.estado else None,
+                "id_local": mesa.id_local
+            }
+        }), 200
+        
+    except ValueError as e:
+        logger.error(f"Error de validación al actualizar mesa {id_mesa}: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Datos inválidos", "detalle": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error al actualizar mesa {id_mesa}: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Error al actualizar la mesa", "detalle": str(e)}), 500
 
-@gestionlocal_bp.errorhandler(404)
-def not_found(error):
-    return jsonify({"error": "Recurso no encontrado"}), 404
+
+@gestionlocal_bp.route('/mis-mesas/<int:id_mesa>', methods=['DELETE'])
+@requerir_auth
+def eliminar_mi_mesa(user_id, user_rol, id_mesa):
+    """
+    Elimina una mesa del local vinculado al usuario autenticado
+    DELETE /api/gestionlocal/mis-mesas/<id_mesa>
+    """
+    try:
+        # Obtener el usuario para verificar su id_local
+        usuario = db_session.query(Usuario).filter(Usuario.id == user_id).first()
+        
+        if not usuario:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+            
+        if not usuario.id_local:
+            return jsonify({"error": "Usuario no vinculado a ningún local"}), 404
+        
+        id_local = usuario.id_local
+        
+        # Verificar que la mesa existe y pertenece al local del usuario
+        mesa = db_session.query(Mesa).filter_by(id=id_mesa, id_local=id_local).first()
+        if not mesa:
+            return jsonify({"error": "Mesa no encontrada en tu local"}), 404
+        
+        # Verificar si la mesa tiene reservas activas
+        reservas_activas = db_session.query(ReservaMesa).join(Reserva).filter(
+            ReservaMesa.id_mesa == id_mesa,
+            Reserva.estado.in_([EstadoReservaEnum.PENDIENTE, EstadoReservaEnum.CONFIRMADA])
+        ).count()
+        
+        if reservas_activas > 0:
+            return jsonify({
+                "error": "No se puede eliminar la mesa porque tiene reservas activas",
+                "reservas_activas": reservas_activas
+            }), 400
+        
+        # Guardar información antes de eliminar
+        mesa_info = {
+            "id": mesa.id,
+            "nombre": mesa.nombre
+        }
+        
+        db_session.delete(mesa)
+        db_session.commit()
+        
+        return jsonify({
+            "mensaje": "Mesa eliminada exitosamente",
+            "mesa": mesa_info
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error al eliminar mesa {id_mesa}: {e}")
+        db_session.rollback()
+        return jsonify({"error": "Error al eliminar la mesa", "detalle": str(e)}), 500
 
 
 @gestionlocal_bp.errorhandler(500)
