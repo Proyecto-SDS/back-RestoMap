@@ -4,9 +4,8 @@ from database import db_session, engine, Base
 import os
 import logging
 import time
-import threading # <--- 1. IMPORTAR THREADING
 
-# Importamos modelos
+# Importamos modelos para asegurar que SQLAlchemy los reconozca
 import models
 from models import Local
 
@@ -17,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Intentar importar el script de seed
+# Intentar importar el script de seed de forma segura
 seed_database_func = None
 try:
     from reboot_db import seed_database
@@ -38,50 +37,13 @@ def create_app():
     
     app.config['JSON_SORT_KEYS'] = False
 
-    # ====================================================================
-    # LÓGICA DE AUTO-POBLADO EN SEGUNDO PLANO (THREADING)
-    # ====================================================================
+    # 1. Crear Tablas al inicio (Siempre necesario)
     with app.app_context():
         try:
             logger.info("🛠️ Verificando esquema de Base de Datos...")
             Base.metadata.create_all(bind=engine)
-            
-            if seed_database_func:
-                try:
-                    # Verificación rápida (Síncrona)
-                    local_existente = db_session.query(Local).first()
-                    
-                    if not local_existente:
-                        logger.warning("📉 DB Vacía. Iniciando Seed en SEGUNDO PLANO...")
-                        
-                        # --- FUNCIÓN WRAPPER PARA EL HILO ---
-                        def run_seed_in_background(app_context):
-                            # Necesitamos empujar el contexto de la app dentro del hilo
-                            with app_context:
-                                try:
-                                    logger.info("🧵 Hilo de Seed iniciado...")
-                                    start_time = time.time()
-                                    seed_database_func()
-                                    elapsed = time.time() - start_time
-                                    logger.info(f"✅ Hilo de Seed completado en {elapsed:.2f}s")
-                                except Exception as e:
-                                    logger.error(f"❌ Error en Hilo de Seed: {e}")
-                        
-                        # --- LANZAR EL HILO ---
-                        # Esto permite que Flask continúe cargando INMEDIATAMENTE
-                        # mientras la base de datos se llena en paralelo.
-                        seed_thread = threading.Thread(target=run_seed_in_background, args=(app.app_context(),))
-                        seed_thread.start()
-                        
-                    else:
-                        logger.info("📦 La base de datos ya tiene datos.")
-                        
-                except Exception as e_seed:
-                    logger.error(f"❌ Error al intentar iniciar seed: {e_seed}")
-            
         except Exception as e:
             logger.error(f"❌ Error crítico inicializando DB: {e}")
-    # ====================================================================
 
     @app.teardown_appcontext
     def shutdown_session(exception=None):
@@ -90,6 +52,30 @@ def create_app():
     @app.route("/")
     def health_check():
         return jsonify({"status": "ok", "message": "Backend funcionando"})
+
+    # ====================================================================
+    # ENDPOINT PARA GITHUB ACTIONS (Este es el que llamará el YAML)
+    # ====================================================================
+    @app.route("/debug/force-seed", methods=['POST'])
+    def force_seed_endpoint():
+        if not seed_database_func:
+            return jsonify({"error": "No se encontró función de seed"}), 500
+        
+        try:
+            logger.info("🌱 Ejecutando Seed a petición externa...")
+            start_time = time.time()
+            
+            # Ejecutamos el seed (borra y crea datos)
+            seed_database_func()
+            
+            elapsed = time.time() - start_time
+            logger.info(f"✅ Seed completado en {elapsed:.2f}s")
+            return jsonify({"status": "success", "message": "Base de datos poblada"})
+            
+        except Exception as e:
+            logger.error(f"❌ Error en seed: {e}")
+            return jsonify({"error": str(e)}), 500
+    # ====================================================================
 
     # Registro de Rutas
     try:
