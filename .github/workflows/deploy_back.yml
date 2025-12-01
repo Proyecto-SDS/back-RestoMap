@@ -7,7 +7,7 @@ on:
       branch:
         description: "Branch a probar (ej: feat/bugfix-branch)"
         required: true
-        default: "develop"
+        default: "capsula3-backend"
       duration_minutes:
         description: "Duración del servicio de pruebas (en minutos)"
         required: false
