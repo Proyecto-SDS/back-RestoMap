@@ -61,7 +61,7 @@ jobs:
           --async # Usamos async para no bloquear el runner
         echo "SQL_INSTANCE_CONNECTION_NAME=${PROJECT_ID}:${GCP_REGION}:${SQL_INSTANCE_ID}" >> $GITHUB_ENV
         
-    - name: ⏳ Wait for SQL Instance to be Ready # CORRECCIÓN: Script de polling en lugar de acción externa
+    - name: ⏳ Wait for SQL Instance to be Ready
       run: |
         echo "Waiting for SQL Instance to become RUNNABLE (Max 10 minutes)..."
         MAX_RETRIES=60
@@ -86,16 +86,12 @@ jobs:
     - name: ⚙️ Create Database and User
       run: |
         # Configurar la DB y el usuario de la aplicación.
-        # Esto requiere que la Service Account tenga 'Cloud SQL Client' y el DB tenga acceso.
         gcloud sql users create ${DB_USER} \
           --instance=${SQL_INSTANCE_ID} \
           --password=${{ secrets.CI_DB_PASSWORD }} \
           --host=%
           
-        # Como es una instancia nueva, la DB 'postgres' ya existe.
-        # Aquí crearíamos la DB ${DB_NAME} si fuera necesario. 
-        # Para PostgreSQL, la DB se crea automáticamente en el paso siguiente 
-        # cuando se usa la conexión. Opcionalmente, se usa el comando sql-databases create.
+        # Crear la base de datos vacía
         gcloud sql databases create ${DB_NAME} --instance=${SQL_INSTANCE_ID}
         
     # --- 2. CONSTRUCCIÓN Y DESPLIEGUE ---
@@ -129,7 +125,24 @@ jobs:
         SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${GCP_REGION} --format 'value(status.url)')
         echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
         echo "::notice title=Deployment Successful::🔗 URL de Pruebas: $SERVICE_URL"
+
+    # --- NUEVO PASO: POBLAR BASE DE DATOS ---
+    - name: 🌱 Poblar Base de Datos (Seed)
+      run: |
+        echo "Esperando 10s para asegurar que el servicio inició..."
+        sleep 10
         
+        # Recuperamos la URL del paso anterior
+        SERVICE_URL=${{ steps.deploy.outputs.service_url }}
+        
+        echo "Disparando Seed en: $SERVICE_URL"
+        
+        # Llamamos al endpoint debug/force-seed usando POST.
+        # --fail hace que el paso falle si el servidor retorna error 500.
+        curl --fail -X POST "$SERVICE_URL/debug/force-seed"
+        
+        echo "✅ Base de datos poblada exitosamente."
+
     - name: ✅ Show Test URL
       run: |
         echo "### 🎉 Despliegue de Pruebas Listo"
