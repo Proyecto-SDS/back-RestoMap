@@ -1,8 +1,10 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
-from database import db_session
+from database import db_session, engine, Base # <--- 1. IMPORTA ENGINE Y BASE
 import os
 import logging
+
+import models 
 
 # Configurar logging
 logging.basicConfig(
@@ -29,6 +31,15 @@ def create_app():
     
     # Configuración básica
     app.config['JSON_SORT_KEYS'] = False
+
+    # Esto revisa si las tablas existen en GCP. Si no, las crea.
+    with app.app_context():
+        try:
+            logger.info("Verificando existencia de tablas en la BD...")
+            Base.metadata.create_all(bind=engine)
+            logger.info("✅ Tablas verificadas/creadas correctamente.")
+        except Exception as e:
+            logger.error(f"❌ Error al crear tablas: {e}")
     
     # Manejo de cierre de sesión de base de datos
     @app.teardown_appcontext
@@ -52,7 +63,6 @@ def create_app():
     app.register_blueprint(opiniones_bp)
     app.register_blueprint(reservas_bp)
     app.register_blueprint(favoritos_bp)
-
 
     return app
 
