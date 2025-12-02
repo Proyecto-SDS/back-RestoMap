@@ -1,96 +1,114 @@
-"""
-Script de Seed (Datos Iniciales)
-Puebla la base de datos con datos de referencia y ejemplos de testing
-Versión optimizada para Cloud Run y Docker
-"""
-import sys
-import os
 import logging
-from dotenv import load_dotenv
-
-# --- 1. CONFIGURACIÓN DE RUTAS (CRUCIAL PARA CLOUD RUN) ---
-# Obtenemos la ruta absoluta de este archivo (src/db/seed.py)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Obtenemos la ruta 'src' (padre de db)
-src_dir = os.path.dirname(current_dir)
-# Agregamos 'src' al path de Python si no está
-if src_dir not in sys.path:
-    sys.path.append(src_dir)
-
-# Configuración de Logging (para que se vea bien en Google Cloud)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+from database import SessionLocal, engine, Base
+from models import (
+    Rol, Comuna, TipoLocal, TipoFoto, TipoRed, Categoria,
+    Direccion, Local, Horario, Mesa, Redes, Foto,
+    TipoHorarioEnum, EstadoMesaEnum, RolEnum
 )
+from datetime import date, time
+
 logger = logging.getLogger(__name__)
 
-try:
-    # --- 2. IMPORTACIONES ---
-    # Importamos la fábrica de sesiones desde database.py
-    from database import SessionLocal, engine, Base
-    
-    # Importamos las funciones de seed
-    # Intentamos importar desde 'seeds' (si corremos en src/db) o 'db.seeds' (si corremos en src)
-    try:
-        from seeds import (
-            create_roles, create_catalogs, create_users, create_locals,
-            create_products, create_interactions, create_reservations,
-            create_orders, create_qrs
-        )
-    except ImportError:
-        from db.seeds import (
-            create_roles, create_catalogs, create_users, create_locals,
-            create_products, create_interactions, create_reservations,
-            create_orders, create_qrs
-        )
-
-except ImportError as e:
-    logger.error(f"Error crítico de importación: {e}")
-    logger.error("Asegúrate de que estás ejecutando esto con PYTHONPATH=/app/src o desde la raíz correcta.")
-    sys.exit(1)
-
 def seed_database():
-    """Pobla la base de datos con datos iniciales"""
+    """
+    Puebla la base de datos de manera SEGURA.
+    No borra tablas. Solo agrega datos si las tablas están vacías.
+    """
+    logger.info("🛡️ Iniciando Seed Seguro (Sin borrar datos)...")
     
-    # --- LIMPIEZA DE BASE DE DATOS ---
-    logger.info("♻Limpiando base de datos completa...")
-    try:
-        # Eliminar todas las tablas y volver a crearlas
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-        logger.info("   ✓ Base de datos limpiada y recreada.")
-    except Exception as e:
-        logger.error(f"   Error al limpiar base de datos: {e}")
-        # Intentamos continuar
+    # 1. Asegurar que las tablas existan (Esto es seguro, no sobrescribe)
+    Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
-    logger.info("Iniciando proceso de Seed en la base de datos...")
-    
     try:
-        create_roles(db)
-        create_catalogs(db)
-        create_locals(db)  # Locales primero (antes de usuarios)
-        create_users(db)   # Usuarios después (necesitan locales)
-        create_products(db)
-        create_interactions(db)
-        create_reservations(db)
-        create_orders(db)
-        create_qrs(db)
+        # --- DATOS MAESTROS ---
         
-        logger.info("Base de datos poblada exitosamente con datos completos!")
+        # Roles
+        if db.query(Rol).count() == 0:
+            logger.info("   -> Creando Roles...")
+            db.add_all([
+                Rol(id=1, nombre="admin"),
+                Rol(id=2, nombre="gerente"),
+                Rol(id=3, nombre="cliente")
+            ])
+            db.commit()
+
+        # Comunas
+        if db.query(Comuna).count() == 0:
+            logger.info("   -> Creando Comunas...")
+            db.add_all([
+                Comuna(id=1, nombre="Santiago"),
+                Comuna(id=14, nombre="Las Condes"),
+                Comuna(id=23, nombre="Providencia")
+            ])
+            db.commit()
+
+        # Tipos de Local
+        if db.query(TipoLocal).count() == 0:
+            logger.info("   -> Creando Tipos de Local...")
+            db.add_all([
+                TipoLocal(id=1, nombre="Restaurante"),
+                TipoLocal(id=2, nombre="Bar"),
+                TipoLocal(id=3, nombre="Restobar")
+            ])
+            db.commit()
+            
+        # Tipos de Foto
+        if db.query(TipoFoto).count() == 0:
+            db.add_all([TipoFoto(id=1, nombre="banner"), TipoFoto(id=2, nombre="logo")])
+            db.commit()
+
+        # Tipos de Red
+        if db.query(TipoRed).count() == 0:
+            db.add_all([TipoRed(id=1, nombre="website"), TipoRed(id=2, nombre="instagram")])
+            db.commit()
+
+        # --- DATOS DE PRUEBA (LOCALES) ---
         
+        # Solo insertamos locales si NO existen
+        if db.query(Local).count() == 0:
+            logger.info("   -> Creando Locales de Ejemplo...")
+            
+            # Dirección 1
+            dir1 = Direccion(id_comuna=1, calle="Av. Prueba", numero=123, longitud=-70.6, latitud=-33.4)
+            db.add(dir1)
+            db.commit() # Commit para obtener ID
+            
+            # Local 1
+            local1 = Local(
+                id_direccion=dir1.id,
+                id_tipo_local=1,
+                nombre="Restaurante Demo Cloud",
+                descripcion="Local generado automáticamente para pruebas.",
+                telefono=99999999,
+                correo="demo@cloud.com"
+            )
+            db.add(local1)
+            db.commit()
+            
+            # Horarios Local 1
+            for dia in range(1, 8):
+                db.add(Horario(
+                    id_local=local1.id, tipo=TipoHorarioEnum.NORMAL,
+                    fecha_inicio=date(2024, 1, 1), fecha_fin=date(2030, 12, 31),
+                    dia_semana=dia, hora_apertura=time(12, 0), hora_cierre=time(23, 0),
+                    abierto=True
+                ))
+            
+            # Mesas Local 1
+            for i in range(1, 6):
+                db.add(Mesa(id_local=local1.id, nombre=f"Mesa {i}", capacidad=4, estado=EstadoMesaEnum.DISPONIBLE))
+                
+            db.commit()
+            logger.info("   ✅ Locales creados.")
+        else:
+            logger.info("   ℹ️ Ya existen locales. Se omite la inserción.")
+
+        logger.info("✅ Seed Seguro finalizado con éxito.")
+
     except Exception as e:
-        logger.error(f"Error fatal al poblar la base de datos: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        logger.error(f"❌ Error en Seed: {e}")
         db.rollback()
-        sys.exit(1)
+        raise e
     finally:
         db.close()
-
-if __name__ == "__main__":
-    # Cargar variables de entorno (solo si se corre local)
-    load_dotenv()
-    
-    # Ejecutar seed
-    seed_database()
