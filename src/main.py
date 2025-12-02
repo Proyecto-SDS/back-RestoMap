@@ -27,12 +27,15 @@ def create_app():
     from routes.auth import auth_bp
     from routes.opiniones import opiniones_bp
     from routes.reservas import reservas_bp
+    from routes.favoritos import favoritos_bp
+    from dashboard_mesero.routes import pedidos_bp
     
     app.register_blueprint(locales_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(opiniones_bp)
     app.register_blueprint(reservas_bp)
-
+    app.register_blueprint(favoritos_bp)
+    app.register_blueprint(pedidos_bp)
 
     return app
 
