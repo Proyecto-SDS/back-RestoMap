@@ -47,6 +47,7 @@ def create_app():
     from routes.reservas import reservas_bp
     from routes.favoritos import favoritos_bp
     from routes.gestionlocal import gestionlocal_bp
+    from dashboard_mesero.routes import pedidos_bp
     
     app.register_blueprint(locales_bp)
     app.register_blueprint(auth_bp)
@@ -55,6 +56,7 @@ def create_app():
     app.register_blueprint(favoritos_bp)
     app.register_blueprint(gestionlocal_bp)
 
+    app.register_blueprint(pedidos_bp)
 
     return app
 
