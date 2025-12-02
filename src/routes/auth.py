@@ -47,6 +47,11 @@ def login():
                 "correo": "usuario@example.com",
                 "telefono": "+56912345678",
                 "rol": "usuario",
+                "id_local": 1,
+                "local": {
+                    "id": 1,
+                    "nombre": "El Gran Sabor"
+                },
                 "creado_el": "2024-01-01T12:00:00"
             }
         }
@@ -95,6 +100,14 @@ def login():
         # Formatear teléfono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
         
+        # Información del local si el usuario está vinculado a uno
+        local_info = None
+        if usuario.id_local and usuario.local:
+            local_info = {
+                'id': usuario.local.id,
+                'nombre': usuario.local.nombre
+            }
+        
         # Respuesta exitosa
         return jsonify({
             'success': True,
@@ -105,6 +118,8 @@ def login():
                 'correo': usuario.correo,
                 'telefono': telefono_formateado,
                 'rol': rol_nombre,
+                'id_local': usuario.id_local,
+                'local': local_info,
                 'creado_el': usuario.creado_el.isoformat() if usuario.creado_el else None
             }
         }), 200
@@ -240,6 +255,11 @@ def get_profile(user_id, user_rol):
             "correo": "usuario@example.com",
             "telefono": "+56912345678",
             "rol": "usuario",
+            "id_local": 1,
+            "local": {
+                "id": 1,
+                "nombre": "El Gran Sabor"
+            },
             "creado_el": "2024-01-01T12:00:00"
         }
         
@@ -249,7 +269,7 @@ def get_profile(user_id, user_rol):
     try:
         db = next(get_db())
         
-        # Buscar usuario
+        # Buscar usuario con su local (si tiene)
         usuario = db.execute(
             select(Usuario).where(Usuario.id == user_id)
         ).scalar_one_or_none()
@@ -260,12 +280,22 @@ def get_profile(user_id, user_rol):
         # Formatear teléfono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
         
+        # Información del local si el usuario está vinculado a uno
+        local_info = None
+        if usuario.id_local and usuario.local:
+            local_info = {
+                'id': usuario.local.id,
+                'nombre': usuario.local.nombre
+            }
+        
         return jsonify({
             'id': str(usuario.id),
             'nombre': usuario.nombre,
             'correo': usuario.correo,
             'telefono': telefono_formateado,
             'rol': user_rol,
+            'id_local': usuario.id_local,
+            'local': local_info,
             'creado_el': usuario.creado_el.isoformat() if usuario.creado_el else None
         }), 200
         

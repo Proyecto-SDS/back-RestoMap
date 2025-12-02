@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from database import db_session, engine, Base
 import os
@@ -10,40 +10,47 @@ import models
 from models import Local
 
 # Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Intentar importar el script de seed de forma segura
+# --- IMPORTACIÓN ROBUSTA DEL SCRIPT DE SEED ---
 seed_database_func = None
+seed_source = "Ninguno"
+
 try:
-    from reboot_db import seed_database
+    # 1. Intento principal: Tu ruta específica (src/db/seed.py)
+    # En Python, las carpetas se navegan con puntos
+    from src.db.seed import seed_database
     seed_database_func = seed_database
+    seed_source = "src/db/seed.py"
 except ImportError:
     try:
-        from seeds import seed_database
+        # 2. Intento secundario: Si main.py ya está dentro de src
+        from db.seed import seed_database
         seed_database_func = seed_database
+        seed_source = "db/seed.py"
     except ImportError:
-        logger.warning("⚠️ No se encontró el archivo de seeds.")
+        try:
+            # 3. Intento raíz: Si decidiste moverlo a la raíz
+            from seed import seed_database
+            seed_database_func = seed_database
+            seed_source = "seed.py"
+        except ImportError:
+            logger.warning("⚠️ CRÍTICO: No se encontró seed_database en src/db/seed.py ni rutas alternas.")
 
 def create_app():
     app = Flask(__name__)
     
-    # Configurar CORS
     allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
     CORS(app, resources={r"/api/*": {"origins": allowed_origins, "supports_credentials": True}})
-    
     app.config['JSON_SORT_KEYS'] = False
 
-    # 1. Crear Tablas al inicio (Siempre necesario)
+    # 1. Crear Tablas (Schema)
     with app.app_context():
         try:
-            logger.info("🛠️ Verificando esquema de Base de Datos...")
             Base.metadata.create_all(bind=engine)
         except Exception as e:
-            logger.error(f"❌ Error crítico inicializando DB: {e}")
+            logger.error(f"❌ Error DB Init: {e}")
 
     @app.teardown_appcontext
     def shutdown_session(exception=None):
@@ -51,26 +58,54 @@ def create_app():
 
     @app.route("/")
     def health_check():
-        return jsonify({"status": "ok", "message": "Backend funcionando"})
+        return jsonify({
+            "status": "ok", 
+            "message": "Backend funcionando",
+            "seed_source": seed_source  # Te dirá qué archivo encontró
+        })
 
+    # Registrar Blueprints (Rutas)
+    from routes import locales_bp
+    from routes.auth import auth_bp
+    from routes.opiniones import opiniones_bp
+    from routes.reservas import reservas_bp
+    from routes.favoritos import favoritos_bp
+    from routes.gestionlocal import gestionlocal_bp
+    from dashboard_mesero.routes import pedidos_bp
+    
+    app.register_blueprint(locales_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(opiniones_bp)
+    app.register_blueprint(reservas_bp)
+    app.register_blueprint(favoritos_bp)
+    app.register_blueprint(gestionlocal_bp)
+
+    app.register_blueprint(pedidos_bp)
     # ====================================================================
-    # ENDPOINT PARA GITHUB ACTIONS (Este es el que llamará el YAML)
+    # ENDPOINT PARA GITHUB ACTIONS
     # ====================================================================
     @app.route("/debug/force-seed", methods=['POST'])
     def force_seed_endpoint():
         if not seed_database_func:
-            return jsonify({"error": "No se encontró función de seed"}), 500
+            return jsonify({
+                "error": "Script no encontrado", 
+                "message": f"Se buscó en src/db/seed.py y falló. Fuente: {seed_source}"
+            }), 500
         
+        env = os.environ.get("ENV", "production")
+        if env == "production":
+            return jsonify({"error": "Forbidden", "message": "Seed bloqueado en producción"}), 403
+
         try:
-            logger.info("🌱 Ejecutando Seed a petición externa...")
+            logger.info(f"🌱 Ejecutando Seed desde {seed_source}...")
             start_time = time.time()
             
-            # Ejecutamos el seed (borra y crea datos)
+            # Ejecutar lógica
             seed_database_func()
             
             elapsed = time.time() - start_time
             logger.info(f"✅ Seed completado en {elapsed:.2f}s")
-            return jsonify({"status": "success", "message": "Base de datos poblada"})
+            return jsonify({"status": "success", "message": "Base de datos poblada correctamente"})
             
         except Exception as e:
             logger.error(f"❌ Error en seed: {e}")
@@ -84,15 +119,13 @@ def create_app():
         from routes.opiniones import opiniones_bp
         from routes.reservas import reservas_bp
         from routes.favoritos import favoritos_bp
-        
         app.register_blueprint(locales_bp)
         app.register_blueprint(auth_bp)
         app.register_blueprint(opiniones_bp)
         app.register_blueprint(reservas_bp)
         app.register_blueprint(favoritos_bp)
-        
-    except ImportError as e:
-        logger.error(f"❌ ERROR IMPORTANDO RUTAS: {e}")
+    except ImportError:
+        pass
 
     return app
 
@@ -100,5 +133,12 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
-    debug_mode = os.environ.get("ENV") in ["dev", "development"]
-    app.run(host="0.0.0.0", port=port, debug=debug_mode)
+
+    # Activar debug mode si ENV es dev o development
+    env = os.environ.get("ENV", "production")
+    debug_mode = env in ["dev", "development"]
+
+    logger.info(f"Iniciando servidor en el puerto: {port}")
+    logger.info(f"Modo debug: {debug_mode} (ENV={env})")
+    # Ejecutar en modo debug si se corre directamente
+    app.run(host="0.0.0.0", port=port)

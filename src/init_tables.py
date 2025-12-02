@@ -18,7 +18,7 @@ sys.path.append(os.path.dirname(current_dir))
 try:
     from database import engine, Base
     # Importamos los modelos
-    from models import * # --- AQUÍ ESTABA EL ERROR (Debe haber un salto de línea) ---
+    from models.models import *
     def init_db():
         logger.info(f"Iniciando creación de tablas en: {engine.url}")
         try:

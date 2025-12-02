@@ -364,8 +364,14 @@ def obtener_opiniones_local(id):
 
 @locales_bp.route('/<int:id>/mesas', methods=['GET'])
 def obtener_mesas_local(id):
-    """Obtiene las mesas de un local."""
+    """
+    Obtiene las mesas de un local con estado calculado dinámicamente.
+    El estado se determina basándose en reservas activas en el momento actual.
+    """
     try:
+        from datetime import datetime, timedelta
+        from models.models import EstadoMesaEnum, EstadoReservaEnum
+        
         # Verificar que el local existe
         local = db_session.query(Local).filter(Local.id == id).first()
         if not local:
@@ -377,15 +383,46 @@ def obtener_mesas_local(id):
             .order_by(Mesa.nombre)\
             .all()
         
-        # Formatear mesas
+        # Calcular mesas con reservas activas AHORA
+        ahora = datetime.now()
+        fecha_hoy = ahora.date()
+        hora_inicio = (ahora - timedelta(minutes=30)).time()
+        hora_fin = (ahora + timedelta(hours=2)).time()
+        
+        # Obtener IDs de mesas con reservas activas en este momento
+        from models import Reserva, ReservaMesa
+        reservas_activas = db_session.query(ReservaMesa.id_mesa)\
+            .join(Reserva)\
+            .filter(
+                Reserva.id_local == id,
+                Reserva.fecha_reserva == fecha_hoy,
+                Reserva.hora_reserva >= hora_inicio,
+                Reserva.hora_reserva <= hora_fin,
+                Reserva.estado.in_([EstadoReservaEnum.PENDIENTE, EstadoReservaEnum.CONFIRMADA])
+            )\
+            .all()
+        
+        mesas_reservadas_ids = {r.id_mesa for r in reservas_activas}
+        
+        # Formatear mesas con estado dinámico
         mesas_lista = []
         for mesa in mesas:
+            # Calcular estado dinámico
+            if mesa.estado == EstadoMesaEnum.OCUPADA:
+                estado_actual = "ocupada"
+            elif mesa.estado == EstadoMesaEnum.FUERA_DE_SERVICIO:
+                estado_actual = "fuera_de_servicio"
+            elif mesa.id in mesas_reservadas_ids:
+                estado_actual = "reservada"
+            else:
+                estado_actual = "disponible"
+            
             mesas_lista.append({
                 'id': str(mesa.id),
                 'nombre': mesa.nombre,
                 'descripcion': mesa.descripcion,
                 'capacidad': mesa.capacidad,
-                'estado': mesa.estado.value if mesa.estado else 'disponible'
+                'estado': estado_actual
             })
         
         return jsonify({

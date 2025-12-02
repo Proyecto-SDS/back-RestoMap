@@ -91,7 +91,7 @@ services:
 
   frontend:
     build:
-      context: ../frontend
+      context: ../../frontend/front-RestoMap
       dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
@@ -101,7 +101,7 @@ services:
       # Importante para que el hot-reload funcione bien en Windows/Docker
       - WATCHPACK_POLLING=true
     volumes:
-      - ../frontend:/app
+      - ../../frontend/front-RestoMap:/app
       - /app/node_modules
       - /app/.next
     depends_on:
