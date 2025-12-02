@@ -46,12 +46,14 @@ def create_app():
     from routes.opiniones import opiniones_bp
     from routes.reservas import reservas_bp
     from routes.favoritos import favoritos_bp
+    from routes.gestionlocal import gestionlocal_bp
     
     app.register_blueprint(locales_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(opiniones_bp)
     app.register_blueprint(reservas_bp)
     app.register_blueprint(favoritos_bp)
+    app.register_blueprint(gestionlocal_bp)
 
 
     return app

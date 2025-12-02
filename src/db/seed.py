@@ -69,8 +69,8 @@ def seed_database():
     try:
         create_roles(db)
         create_catalogs(db)
-        create_users(db)
-        create_locals(db)
+        create_locals(db)  # Locales primero (antes de usuarios)
+        create_users(db)   # Usuarios después (necesitan locales)
         create_products(db)
         create_interactions(db)
         create_reservations(db)
