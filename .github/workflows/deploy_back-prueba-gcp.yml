@@ -1,15 +1,14 @@
 name: Despliegue entorno pruebas GCP back
 
 on:
-  # Permite la ejecución manual con inputs
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch a probar (ej: feat/bugfix-branch)'
+        description: 'Branch a probar'
         required: true
         default: 'develop'
       duration_minutes:
-        description: 'Duración del servicio de pruebas (en minutos)'
+        description: 'Duración del servicio (min)'
         required: false
         default: 15
         type: number
@@ -18,8 +17,8 @@ env:
   PROJECT_ID: restomap-478918
   GCP_REGION: us-central1
   REPO_NAME: repo
-  SERVICE_NAME: test-backend-${{ github.run_id }} # Nombre de servicio único
-  SQL_INSTANCE_ID: ci-sql-test-${{ github.run_id }} # Nombre de instancia SQL único
+  SERVICE_NAME: test-backend-${{ github.run_id }}
+  SQL_INSTANCE_ID: ci-sql-test-${{ github.run_id }}
   DB_USER: ci_user
   DB_NAME: test_db_ci
 
@@ -36,7 +35,7 @@ jobs:
       with:
         ref: ${{ github.event.inputs.branch }}
 
-    - name: 🔑 Autenticación con GCP (WIF)
+    - name: 🔑 Autenticación con GCP
       uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: 'projects/414435283954/locations/global/workloadIdentityPools/github-pool/providers/github-provider1'
@@ -45,8 +44,6 @@ jobs:
     - name: 🏗️ Setup Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    # --- 1. CREACIÓN DE CLOUD SQL TEMPORAL ---
-    # La contraseña se inyecta desde un Secret de GitHub
     - name: 💾 Create Cloud SQL Test Instance
       id: create_sql
       run: |
@@ -58,43 +55,30 @@ jobs:
           --storage-type=SSD \
           --storage-auto-increase \
           --root-password=${{ secrets.CI_DB_PASSWORD }} \
-          --async # Usamos async para no bloquear el runner
+          --async
         echo "SQL_INSTANCE_CONNECTION_NAME=${PROJECT_ID}:${GCP_REGION}:${SQL_INSTANCE_ID}" >> $GITHUB_ENV
         
-    - name: ⏳ Wait for SQL Instance to be Ready
+    - name: ⏳ Wait for SQL Instance
       run: |
-        echo "Waiting for SQL Instance to become RUNNABLE (Max 10 minutes)..."
+        echo "Waiting for SQL Instance..."
         MAX_RETRIES=60
         RETRY_COUNT=0
-        
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
           STATUS=$(gcloud sql instances describe ${{ env.SQL_INSTANCE_ID }} --project=${{ env.PROJECT_ID }} --format="value(state)" 2>/dev/null)
-          
           if [ "$STATUS" = "RUNNABLE" ]; then
             echo "Instance is RUNNABLE."
             exit 0
           fi
-          
-          echo "Current status: $STATUS. Retrying in 10 seconds (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
           sleep 10
           RETRY_COUNT=$((RETRY_COUNT + 1))
         done
-        
-        echo "Error: Cloud SQL instance did not become RUNNABLE within 10 minutes."
         exit 1
         
     - name: ⚙️ Create Database and User
       run: |
-        # Configurar la DB y el usuario de la aplicación.
-        gcloud sql users create ${DB_USER} \
-          --instance=${SQL_INSTANCE_ID} \
-          --password=${{ secrets.CI_DB_PASSWORD }} \
-          --host=%
-          
-        # Crear la base de datos vacía
+        gcloud sql users create ${DB_USER} --instance=${SQL_INSTANCE_ID} --password=${{ secrets.CI_DB_PASSWORD }} --host=%
         gcloud sql databases create ${DB_NAME} --instance=${SQL_INSTANCE_ID}
         
-    # --- 2. CONSTRUCCIÓN Y DESPLIEGUE ---
     - name: 🔨 Build and Push Docker Image
       id: build-push
       run: |
@@ -104,11 +88,10 @@ jobs:
         docker push $IMAGE_URI
         echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-    - name: 🚀 Deploy Cloud Run Service for Testing
+    - name: 🚀 Deploy Cloud Run Service
       id: deploy
       run: |
-        # 1. Creamos un archivo YAML temporal con las variables.
-        # Esto evita errores de sintaxis si la contraseña tiene comas o signos raros.
+        # Usamos un archivo temporal para evitar errores de sintaxis con las variables
         cat <<EOF > env_vars.yaml
         ENV: development
         DB_HOST: /cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }}
@@ -116,8 +99,7 @@ jobs:
         DB_NAME: ${{ env.DB_NAME }}
         DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
         EOF
-        
-        # 2. Desplegamos usando --env-vars-file
+
         gcloud run deploy ${SERVICE_NAME} \
           --image ${{ steps.build-push.outputs.image_uri }} \
           --region ${GCP_REGION} \
@@ -132,47 +114,42 @@ jobs:
           
         SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region ${GCP_REGION} --format 'value(status.url)')
         echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
-        echo "::notice title=Deployment Successful::🔗 URL de Pruebas: $SERVICE_URL"
 
-    # --- 3. POBLADO DE DATOS (SEED AUTOMÁTICO) ---
+    # --- POBLADO DE DATOS AUTOMÁTICO ---
     - name: 🌱 Poblar Base de Datos (Seed)
       run: |
-        echo "⏳ Esperando 15s para que Flask inicie completamente..."
+        echo "⏳ Esperando 15s para estabilización..."
         sleep 15
         
         SERVICE_URL=${{ steps.deploy.outputs.service_url }}
         echo "🚀 Disparando Seed en: $SERVICE_URL/debug/force-seed"
         
-        # curl -X POST llama al endpoint que pusimos en main.py
-        # --fail hace que falle el pipeline si el servidor da error 404/500
-        # -L sigue redirecciones si las hubiera
-        curl --fail -L -X POST "$SERVICE_URL/debug/force-seed"
+        # Curl silencioso pero muestra el código de estado
+        HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SERVICE_URL/debug/force-seed")
+        HTTP_BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
+        HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
+        
+        echo "📡 Respuesta:"
+        echo "$HTTP_BODY"
+        
+        if [ "$HTTP_STATUS" -ne 200 ]; then
+          echo "❌ Error Crítico: El seed falló con código $HTTP_STATUS"
+          exit 1
+        fi
         
         echo "✅ Base de datos poblada exitosamente."
 
     - name: ✅ Show Test URL
       run: |
         echo "### 🎉 Despliegue de Pruebas Listo"
-        echo "🔗 **URL de Pruebas:** [API Endpoint](${{ steps.deploy.outputs.service_url }})"
-        echo "---"
-        echo "Este servicio se eliminará en **${{ github.event.inputs.duration_minutes }}** minutos."
+        echo "🔗 **URL:** [${{ steps.deploy.outputs.service_url }}](${{ steps.deploy.outputs.service_url }})"
 
-    # --- 4. LIMPIEZA (CRUCIAL) ---
-    - name: ⏳ Wait and Cleanup Resources
-      if: always() # ¡Ejecutar SIEMPRE!
+    - name: ⏳ Cleanup
+      if: always()
       run: |
         DURATION=${{ github.event.inputs.duration_minutes }}
         if [ "$DURATION" -gt 0 ]; then
-          echo "Esperando ${DURATION} minutos..."
           sleep $((${DURATION} * 60))
         fi
-        
-        # ELIMINAR CLOUD RUN SERVICE
-        echo "Iniciando limpieza de Cloud Run..."
         gcloud run services delete ${SERVICE_NAME} --region ${GCP_REGION} --quiet || true
-        echo "🗑️ Servicio de Cloud Run eliminado."
-
-        # ELIMINAR CLOUD SQL INSTANCE
-        echo "Iniciando limpieza de Cloud SQL..."
         gcloud sql instances delete ${SQL_INSTANCE_ID} --quiet || true
-        echo "🗑️ Instancia de Cloud SQL eliminada."
