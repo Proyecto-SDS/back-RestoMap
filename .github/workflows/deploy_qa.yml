@@ -2,19 +2,19 @@ name: Despliegue BACK QA
 
 on:
   push:
-    branches: [ "develop" ] # Se activa solo en rama main
+    branches: ["develop"] # Se activa solo en rama main
   workflow_dispatch:
 
 env:
-  PROJECT_ID: 'restomap-478918'
-  REGION: 'us-central1'
-  REPO_NAME: 'repo'
-  SQL_INSTANCE: 'restomap-478918:us-central1:restomap' # ¿Es la misma instancia para prod?
-  SERVICE_NAME: 'backend-prod' # Nombre distintivo para producción
+  PROJECT_ID: "restomap-478918"
+  REGION: "us-central1"
+  REPO_NAME: "repo"
+  SQL_INSTANCE: "restomap-478918:us-central1:restomap" # ¿Es la misma instancia para prod?
+  SERVICE_NAME: "backend-prod" # Nombre distintivo para produccion
 
 permissions:
-  contents: 'read'
-  id-token: 'write'
+  contents: "read"
+  id-token: "write"
 
 jobs:
   deploy:
@@ -25,23 +25,23 @@ jobs:
 
       - uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/414435283954/locations/global/workloadIdentityPools/github-pool/providers/github-provider1'
-          service_account: 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com'
+          workload_identity_provider: "projects/414435283954/locations/global/workloadIdentityPools/github-pool/providers/github-provider1"
+          service_account: "github-deploy-sa@restomap-478918.iam.gserviceaccount.com"
 
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Build y Push Docker
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev
-          
-          # Etiqueta específica para prod
+
+          # Etiqueta especifica para prod
           IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend-prod:${{ github.sha }}"
-          
-          # Construimos usando el archivo específico (basado en tu config de QA)
+
+          # Construimos usando el archivo especifico (basado en tu config de QA)
           docker build -f dockerfile.backend -t $IMAGE_TAG .
-          
+
           docker push $IMAGE_TAG
-          
+
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image $IMAGE_TAG \
             --region ${{ env.REGION }} \
@@ -49,4 +49,3 @@ jobs:
             --min-instances 1 \
             --add-cloudsql-instances="${{ env.SQL_INSTANCE }}" \
             --set-env-vars="DB_HOST=/cloudsql/${{ env.SQL_INSTANCE }},DB_USER=${{ secrets.DB_USER }},DB_PASSWORD=${{ secrets.DB_PASSWORD }},DB_NAME=${{ secrets.DB_NAME }}"
-            

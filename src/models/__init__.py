@@ -1,5 +1,5 @@
 """
-Módulo de modelos SQLAlchemy y Schemas Pydantic
+Modulo de modelos SQLAlchemy y Schemas Pydantic
 Exporta todos los modelos, schemas y enums para facilitar importaciones
 """
 
@@ -27,7 +27,7 @@ from .models import (
     TipoFoto,
     Categoria,
     
-    # ============ Modelos - Ubicación ============
+    # ============ Modelos - Ubicacion ============
     Direccion,
     
     # ============ Modelos - Locales ============
@@ -112,7 +112,7 @@ __all__ = [
     "TipoFoto",
     "Categoria",
     
-    # Modelos - Ubicación
+    # Modelos - Ubicacion
     "Direccion",
     
     # Modelos - Locales

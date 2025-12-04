@@ -9,7 +9,7 @@ locales_bp = Blueprint('locales', __name__, url_prefix='/api/locales')
 
 @locales_bp.route('/', methods=['GET'])
 def obtener_locales():
-    """Obtiene todos los locales de la base de datos con información completa."""
+    """Obtiene todos los locales de la base de datos con informacion completa."""
     try:
         # Consultar locales con relaciones pre-cargadas para optimizar
         locales = db_session.query(Local)\
@@ -101,7 +101,7 @@ def obtener_locales():
 
 @locales_bp.route('/<int:id>', methods=['GET'])
 def obtener_local(id):
-    """Obtiene un local específico por ID con información detallada."""
+    """Obtiene un local especifico por ID con informacion detallada."""
     try:
         local = db_session.query(Local)\
             .options(
@@ -134,7 +134,7 @@ def obtener_local(id):
             for opinion in opiniones_activas:
                 opiniones_lista.append({
                     'id': opinion.id,
-                    'usuario': opinion.usuario.nombre if opinion.usuario else 'Anónimo',
+                    'usuario': opinion.usuario.nombre if opinion.usuario else 'Anonimo',
                     'puntuacion': float(opinion.puntuacion) if opinion.puntuacion else None,
                     'comentario': opinion.comentario,
                     'fecha': opinion.creado_el.isoformat() if opinion.creado_el else None
@@ -149,7 +149,7 @@ def obtener_local(id):
         
         dias_semana = {
             1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 
-            4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
+            4: 'Jueves', 5: 'Viernes', 6: 'Sabado', 7: 'Domingo'
         }
         
         horarios_formateados = []
@@ -168,7 +168,7 @@ def obtener_local(id):
                         closing_time = horario.hora_cierre.strftime('%H:%M')
             
             horarios_formateados.append({
-                'dia': dias_semana.get(horario.dia_semana, f'Día {horario.dia_semana}'),
+                'dia': dias_semana.get(horario.dia_semana, f'Dia {horario.dia_semana}'),
                 'diaNumero': horario.dia_semana,
                 'apertura': horario.hora_apertura.strftime('%H:%M'),
                 'cierre': horario.hora_cierre.strftime('%H:%M'),
@@ -176,14 +176,14 @@ def obtener_local(id):
                 'tipo': horario.tipo.value if horario.tipo else 'normal'
             })
         
-        # Ordenar horarios por día
+        # Ordenar horarios por dia
         horarios_formateados.sort(key=lambda x: x['diaNumero'])
         
         # Obtener todas las fotos organizadas por tipo
         fotos_dict = {
             'banner': [],
             'capturas': [],
-            'hero': [], # Mantener vacío por compatibilidad
+            'hero': [], # Mantener vacio por compatibilidad
             'logo': None,
             'galeria': [],
             'todas': []
@@ -191,14 +191,18 @@ def obtener_local(id):
         
         if local.fotos:
             for foto in local.fotos:
+                # pyrefly: ignore [missing-attribute]
                 fotos_dict['todas'].append(foto.ruta)
                 if foto.tipo_foto:
                     tipo_nombre = foto.tipo_foto.nombre.lower()
                     
                     if tipo_nombre == 'banner':
+                        # pyrefly: ignore [missing-attribute]
                         fotos_dict['banner'].append(foto.ruta)
                     elif tipo_nombre == 'capturas':
+                        # pyrefly: ignore [missing-attribute]
                         fotos_dict['capturas'].append(foto.ruta)
+                        # pyrefly: ignore [missing-attribute]
                         fotos_dict['galeria'].append(foto.ruta) # Mapear capturas a galeria
         
         # Intentar asignar logo si hay capturas (fallback)
@@ -249,14 +253,14 @@ def obtener_local(id):
 
 @locales_bp.route('/<int:id>/productos', methods=['GET'])
 def obtener_productos_local(id):
-    """Obtiene el menú de productos de un local agrupados por categoría."""
+    """Obtiene el menú de productos de un local agrupados por categoria."""
     try:
         # Verificar que el local existe
         local = db_session.query(Local).filter(Local.id == id).first()
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
         
-        # Obtener productos del local con categoría
+        # Obtener productos del local con categoria
         productos = db_session.query(Producto)\
             .options(
                 joinedload(Producto.categoria),
@@ -265,10 +269,10 @@ def obtener_productos_local(id):
             .filter(Producto.id_local == id)\
             .all()
         
-        # Agrupar productos por categoría
+        # Agrupar productos por categoria
         categorias_dict = {}
         for producto in productos:
-            categoria_nombre = producto.categoria.nombre if producto.categoria else 'Sin Categoría'
+            categoria_nombre = producto.categoria.nombre if producto.categoria else 'Sin Categoria'
             
             if categoria_nombre not in categorias_dict:
                 categorias_dict[categoria_nombre] = {
@@ -308,24 +312,24 @@ def obtener_productos_local(id):
 
 @locales_bp.route('/<int:id>/opiniones', methods=['GET'])
 def obtener_opiniones_local(id):
-    """Obtiene opiniones de un local con paginación."""
+    """Obtiene opiniones de un local con paginacion."""
     try:
         # Verificar que el local existe
         local = db_session.query(Local).filter(Local.id == id).first()
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
         
-        # Parámetros de paginación
+        # Parametros de paginacion
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
         
-        # Validar parámetros
+        # Validar parametros
         if page < 1:
             page = 1
         if limit < 1 or limit > 50:
             limit = 10
         
-        # Query de opiniones con paginación
+        # Query de opiniones con paginacion
         offset = (page - 1) * limit
         
         opiniones_query = db_session.query(Opinion)\
@@ -341,8 +345,9 @@ def obtener_opiniones_local(id):
         for opinion in opiniones:
             opiniones_lista.append({
                 'id': opinion.id,
-                'usuario': opinion.usuario.nombre if opinion.usuario else 'Anónimo',
+                'usuario': opinion.usuario.nombre if opinion.usuario else 'Anonimo',
                 'usuarioId': str(opinion.id_usuario) if opinion.id_usuario else None,
+                # pyrefly: ignore [bad-argument-type]
                 'puntuacion': float(opinion.puntuacion) if opinion.puntuacion else None,
                 'comentario': opinion.comentario,
                 'fecha': opinion.creado_el.isoformat() if opinion.creado_el else None
@@ -401,7 +406,7 @@ def obtener_mesas_local(id):
 
 @locales_bp.route('/<int:id>/reservas', methods=['GET'])
 def obtener_reservas_local(id):
-    """Obtiene las reservas de un local para una fecha específica."""
+    """Obtiene las reservas de un local para una fecha especifica."""
     try:
         from models import Reserva, ReservaMesa
         
@@ -410,15 +415,15 @@ def obtener_reservas_local(id):
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
         
-        # Parámetro de fecha (formato: YYYY-MM-DD)
+        # Parametro de fecha (formato: YYYY-MM-DD)
         fecha_str = request.args.get('fecha')
         if not fecha_str:
-            return jsonify({"error": "Parámetro 'fecha' es requerido (formato: YYYY-MM-DD)"}), 400
+            return jsonify({"error": "Parametro 'fecha' es requerido (formato: YYYY-MM-DD)"}), 400
         
         try:
             fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
-            return jsonify({"error": "Formato de fecha inválido. Use: YYYY-MM-DD"}), 400
+            return jsonify({"error": "Formato de fecha invalido. Use: YYYY-MM-DD"}), 400
         
         # Obtener reservas del local para esa fecha
         reservas = db_session.query(Reserva)\
@@ -457,8 +462,8 @@ def obtener_reservas_local(id):
 @locales_bp.route('/<int:id>/horarios-disponibles', methods=['GET'])
 def obtener_horarios_disponibles(id):
     """
-    Obtiene los horarios disponibles de un local para una fecha específica.
-    Si es el mismo día, retorna horarios con mínimo 2 horas desde la hora actual.
+    Obtiene los horarios disponibles de un local para una fecha especifica.
+    Si es el mismo dia, retorna horarios con minimo 2 horas desde la hora actual.
     """
     try:
         # Verificar que el local existe
@@ -470,20 +475,20 @@ def obtener_horarios_disponibles(id):
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
         
-        # Parámetro de fecha (formato: YYYY-MM-DD)
+        # Parametro de fecha (formato: YYYY-MM-DD)
         fecha_str = request.args.get('fecha')
         if not fecha_str:
-            return jsonify({"error": "Parámetro 'fecha' es requerido (formato: YYYY-MM-DD)"}), 400
+            return jsonify({"error": "Parametro 'fecha' es requerido (formato: YYYY-MM-DD)"}), 400
         
         try:
             fecha_seleccionada = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
-            return jsonify({"error": "Formato de fecha inválido. Use: YYYY-MM-DD"}), 400
+            return jsonify({"error": "Formato de fecha invalido. Use: YYYY-MM-DD"}), 400
         
-        # Obtener el día de la semana (1=Lunes, 7=Domingo)
+        # Obtener el dia de la semana (1=Lunes, 7=Domingo)
         dia_semana = fecha_seleccionada.isoweekday()
         
-        # Buscar horario del local para ese día
+        # Buscar horario del local para ese dia
         horario = next((h for h in local.horarios if h.dia_semana == dia_semana and h.abierto), None)
         
         if not horario:
@@ -491,7 +496,7 @@ def obtener_horarios_disponibles(id):
                 'localId': str(id),
                 'fecha': fecha_str,
                 'horarios': [],
-                'mensaje': 'El local está cerrado este día'
+                'mensaje': 'El local esta cerrado este dia'
             }), 200
         
         # Generar slots de tiempo cada 15 minutos desde apertura hasta 1 hora antes del cierre
@@ -512,7 +517,7 @@ def obtener_horarios_disponibles(id):
         
         slots_disponibles = generar_slots(horario.hora_apertura, horario.hora_cierre)
         
-        # Si es el mismo día, filtrar horarios que sean al menos 2 horas desde ahora
+        # Si es el mismo dia, filtrar horarios que sean al menos 2 horas desde ahora
         from datetime import timedelta
         ahora = datetime.now()
         if fecha_seleccionada == ahora.date():
@@ -537,7 +542,7 @@ def obtener_horarios_disponibles(id):
 @locales_bp.route('/<int:id>/mesas-disponibles', methods=['GET'])
 def obtener_mesas_disponibles(id):
     """
-    Verifica la disponibilidad de mesas para una fecha y hora específica.
+    Verifica la disponibilidad de mesas para una fecha y hora especifica.
     """
     try:
         from models import Reserva, ReservaMesa
@@ -547,18 +552,18 @@ def obtener_mesas_disponibles(id):
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
         
-        # Parámetros requeridos
+        # Parametros requeridos
         fecha_str = request.args.get('fecha')
         hora_str = request.args.get('hora')
         
         if not fecha_str or not hora_str:
-            return jsonify({"error": "Parámetros 'fecha' y 'hora' son requeridos"}), 400
+            return jsonify({"error": "Parametros 'fecha' y 'hora' son requeridos"}), 400
         
         try:
             fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
             hora = datetime.strptime(hora_str, '%H:%M').time()
         except ValueError:
-            return jsonify({"error": "Formato de fecha u hora inválido"}), 400
+            return jsonify({"error": "Formato de fecha u hora invalido"}), 400
         
         # Obtener todas las mesas del local
         mesas = db_session.query(Mesa)\

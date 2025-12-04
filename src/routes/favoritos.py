@@ -17,7 +17,7 @@ favoritos_bp = Blueprint('favoritos', __name__, url_prefix='/api/favoritos')
 
 
 def get_db():
-    """Obtener sesión de base de datos"""
+    """Obtener sesion de base de datos"""
     db = SessionLocal()
     try:
         yield db
@@ -101,7 +101,7 @@ def add_favorito(user_id, user_rol):
     Response 400:
         {"error": "localId es requerido"}
         {"error": "Local no encontrado"}
-        {"error": "Este local ya está en favoritos"}
+        {"error": "Este local ya esta en favoritos"}
     """
     try:
         data = request.get_json()
@@ -114,7 +114,7 @@ def add_favorito(user_id, user_rol):
         try:
             local_id = int(local_id)
         except (ValueError, TypeError):
-            return jsonify({'error': 'localId debe ser un número válido'}), 400
+            return jsonify({'error': 'localId debe ser un número valido'}), 400
         
         db = next(get_db())
         
@@ -134,7 +134,7 @@ def add_favorito(user_id, user_rol):
         ).scalar_one_or_none()
         
         if favorito_existente:
-            return jsonify({'error': 'Este local ya está en favoritos'}), 400
+            return jsonify({'error': 'Este local ya esta en favoritos'}), 400
         
         # Crear nuevo favorito
         nuevo_favorito = Favorito(

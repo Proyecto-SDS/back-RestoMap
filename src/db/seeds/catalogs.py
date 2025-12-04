@@ -15,7 +15,7 @@ def create_catalogs(db):
         db.commit()
         logger.info("    ✓ Tipos de Local insertados")
     else:
-        logger.info("    ⚠ Tipos de Local ya existen")
+        logger.info("    Tipos de Local ya existen")
 
     # ============ Comunas ============
     logger.info("  → Insertando Comunas de Santiago...")
@@ -24,9 +24,9 @@ def create_catalogs(db):
             Comuna(nombre="Santiago"),
             Comuna(nombre="Cerrillos"),
             Comuna(nombre="Cerro Navia"),
-            Comuna(nombre="Conchalí"),
+            Comuna(nombre="Conchali"),
             Comuna(nombre="El Bosque"),
-            Comuna(nombre="Estación Central"),
+            Comuna(nombre="Estacion Central"),
             Comuna(nombre="Huechuraba"),
             Comuna(nombre="Independencia"),
             Comuna(nombre="La Cisterna"),
@@ -49,15 +49,15 @@ def create_catalogs(db):
             Comuna(nombre="Quinta Normal"),
             Comuna(nombre="Recoleta"),
             Comuna(nombre="Renca"),
-            Comuna(nombre="San Joaquín"),
+            Comuna(nombre="San Joaquin"),
             Comuna(nombre="San Miguel"),
-            Comuna(nombre="San Ramón"),
+            Comuna(nombre="San Ramon"),
             Comuna(nombre="Vitacura"),
         ])
         db.commit()
         logger.info("    ✓ Comunas insertadas")
     else:
-        logger.info("    ⚠ Comunas ya existen")
+        logger.info("    Comunas ya existen")
 
     # ============ Tipos de Redes Sociales ============
     logger.info("  → Insertando Tipos de Redes Sociales...")
@@ -75,7 +75,7 @@ def create_catalogs(db):
         db.commit()
         logger.info("    ✓ Tipos de Redes Sociales insertados")
     else:
-        logger.info("    ⚠ Tipos de Redes Sociales ya existen")
+        logger.info("    Tipos de Redes Sociales ya existen")
 
     # ============ Tipos de Fotos ============
     logger.info("  → Insertando Tipos de Fotos...")
@@ -87,10 +87,10 @@ def create_catalogs(db):
         db.commit()
         logger.info("    ✓ Tipos de Fotos insertados")
     else:
-        logger.info("    ⚠ Tipos de Fotos ya existen")
+        logger.info("    Tipos de Fotos ya existen")
 
-    # ============ Categorías de Productos ============
-    logger.info("  → Insertando Categorías de Productos...")
+    # ============ Categorias de Productos ============
+    logger.info("  → Insertando Categorias de Productos...")
     if db.query(Categoria).count() == 0:
         db.add_all([
             Categoria(nombre="Entradas"),
@@ -99,10 +99,10 @@ def create_catalogs(db):
             Categoria(nombre="Bebidas"),
             Categoria(nombre="Cervezas"),
             Categoria(nombre="Vinos"),
-            Categoria(nombre="Cócteles"),
+            Categoria(nombre="Cocteles"),
             Categoria(nombre="Cafés"),
         ])
         db.commit()
-        logger.info("    ✓ Categorías insertadas")
+        logger.info("    ✓ Categorias insertadas")
     else:
-        logger.info("    ⚠ Categorías ya existen")
+        logger.info("    Categorias ya existen")

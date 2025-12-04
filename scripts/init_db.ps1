@@ -1,11 +1,11 @@
-# Script de inicialización de base de datos para Windows (desarrollo local)
+# Script de inicializacion de base de datos para Windows (desarrollo local)
 # Este script crea las tablas con Alembic y luego pobla datos iniciales
 
-Write-Host "Iniciando configuración de base de datos..." -ForegroundColor Cyan
+Write-Host "Iniciando configuracion de base de datos..." -ForegroundColor Cyan
 
 # Verificar que las variables de entorno estén cargadas
 if (-not $env:DB_HOST) {
-    Write-Host "⚠Variables de entorno no encontradas. Cargando desde .env..." -ForegroundColor Yellow
+    Write-Host "Variables de entorno no encontradas. Cargando desde .env..." -ForegroundColor Yellow
     
     if (Test-Path ".\.env") {
         Get-Content ".\.env" | ForEach-Object {
@@ -22,9 +22,9 @@ if (-not $env:DB_HOST) {
     }
 }
 
-# Crear migración inicial si no existe
+# Crear migracion inicial si no existe
 if (-not (Test-Path "alembic\versions\*.py")) {
-    Write-Host "Generando migración inicial..." -ForegroundColor Yellow
+    Write-Host "Generando migracion inicial..." -ForegroundColor Yellow
     alembic revision --autogenerate -m "Migracion inicial"
 }
 

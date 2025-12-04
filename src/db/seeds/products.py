@@ -18,7 +18,7 @@ def create_products(db):
             Producto(id_local=1, id_categoria=3, nombre="Leche Asada", 
                     descripcion="Postre tradicional", estado=EstadoProductoEnum.DISPONIBLE, precio=3200),
             Producto(id_local=1, id_categoria=4, nombre="Pisco Sour", 
-                    descripcion="Cóctel nacional", estado=EstadoProductoEnum.DISPONIBLE, precio=4500),
+                    descripcion="Coctel nacional", estado=EstadoProductoEnum.DISPONIBLE, precio=4500),
         ])
         # Productos para Local 2 (Bar)
         db.add_all([
@@ -27,9 +27,9 @@ def create_products(db):
             Producto(id_local=2, id_categoria=7, nombre="Mojito", 
                     descripcion="Ron, menta, lima", estado=EstadoProductoEnum.DISPONIBLE, precio=5500),
             Producto(id_local=2, id_categoria=1, nombre="Tabla de Quesos", 
-                    descripcion="Selección de quesos nacionales", estado=EstadoProductoEnum.DISPONIBLE, precio=8900),
+                    descripcion="Seleccion de quesos nacionales", estado=EstadoProductoEnum.DISPONIBLE, precio=8900),
         ])
-        # Productos para Local 3 (Cafetería)
+        # Productos para Local 3 (Cafeteria)
         db.add_all([
             Producto(id_local=3, id_categoria=8, nombre="Café Americano", 
                     descripcion="Grande", estado=EstadoProductoEnum.DISPONIBLE, precio=2500),
@@ -56,4 +56,4 @@ def create_products(db):
         logger.info(f"    ✓ {len(fotos_productos)} Fotos de Productos insertadas")
         
     else:
-        logger.info("    ⚠ Productos ya existen")
+        logger.info("    Productos ya existen")

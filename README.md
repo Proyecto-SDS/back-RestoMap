@@ -1,12 +1,12 @@
-# Backend - Sistema de Gestión de Locales
+# Backend - Sistema de Gestion de Locales
 
-Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de locales, pedidos y reservas.
+Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestion de locales, pedidos y reservas.
 
 ## Tabla de Contenido
 
 - [Requisitos](#requisitos)
 - [Estructura del Proyecto](#estructura-del-proyecto)
-- [Configuración](#configuración)
+- [Configuracion](#configuracion)
 - [Uso con Docker](#uso-con-docker)
 - [Migraciones de Base de Datos](#migraciones-de-base-de-datos)
 - [API Endpoints](#api-endpoints)
@@ -16,9 +16,9 @@ Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de local
 - Docker Desktop
 - Docker Compose
 
-**No se requiere instalación local de Python ni PostgreSQL** - todo se ejecuta en contenedores Docker.
+**No se requiere instalacion local de Python ni PostgreSQL** - todo se ejecuta en contenedores Docker.
 
-## Configuración
+## Configuracion
 
 ### 1. Variables de Entorno
 
@@ -43,14 +43,14 @@ POSTGRES_USER=tu_usuario
 POSTGRES_PASSWORD=tu_contraseña
 POSTGRES_DB=tu_bd
 
-# Configuración General
+# Configuracion General
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 # Lista separada por comas
 ENV=development # 'production' o 'development'
 ```
 
-## Producción con Docker
+## Produccion con Docker
 
-El proyecto incluye un `Dockerfile` optimizado para producción que utiliza **Gunicorn** como servidor WSGI.
+El proyecto incluye un `Dockerfile` optimizado para produccion que utiliza **Gunicorn** como servidor WSGI.
 
 ### Construir la imagen
 
@@ -67,7 +67,7 @@ docker run -p 5000:5000 \
   backend-restomap
 ```
 
-> **Nota:** En producción (GCP), no uses `docker-compose` para el despliegue del backend. Usa esta imagen individual conectada a una instancia de Cloud SQL.
+> **Nota:** En produccion (GCP), no uses `docker-compose` para el despliegue del backend. Usa esta imagen individual conectada a una instancia de Cloud SQL.
 
 ## Uso con Docker
 
@@ -75,12 +75,12 @@ docker run -p 5000:5000 \
 
 #### Paso 1: Configurar Variables de Entorno
 
-Asegúrate de tener tu archivo `.env` configurado (ver sección [Configuración](#configuración)).
+Asegúrate de tener tu archivo `.env` configurado (ver seccion [Configuracion](#configuracion)).
 
-#### Paso 2: Construir Imágenes Docker
+#### Paso 2: Construir Imagenes Docker
 
 ```bash
-# Construir las imágenes de Docker (primera vez)
+# Construir las imagenes de Docker (primera vez)
 docker-compose build
 ```
 
@@ -109,7 +109,7 @@ NAME                  STATUS
 backend-db-1          Up (healthy)
 ```
 
-Espera hasta que veas `(healthy)` - esto significa que el healthcheck pasó.
+Espera hasta que veas `(healthy)` - esto significa que el healthcheck paso.
 
 #### Paso 5: Inicializar la Base de Datos
 
@@ -120,7 +120,7 @@ docker-compose --profile init run --rm init-db
 
 **Qué hace:**
 
-1. Genera migración inicial de Alembic
+1. Genera migracion inicial de Alembic
 2. Crea todas las tablas en PostgreSQL
 3. Ejecuta `seed.py` para insertar datos de referencia (roles, comunas, etc.)
 4. Inserta 5 locales de ejemplo
@@ -128,8 +128,8 @@ docker-compose --profile init run --rm init-db
 **Salida esperada:**
 
 ```
-Iniciando configuración de base de datos...
-Generando migración inicial...
+Iniciando configuracion de base de datos...
+Generando migracion inicial...
 Aplicando migraciones de base de datos...
 Poblando datos iniciales...
   → Insertando Roles...
@@ -225,32 +225,32 @@ docker-compose up backend
 
 ---
 
-### Explicación de Servicios
+### Explicacion de Servicios
 
 El `docker-compose.yml` tiene 4 servicios, pero solo 2 corren por defecto:
 
-| Servicio  | ¿Se levanta automáticamente? | Propósito                         |
+| Servicio  | ¿Se levanta automaticamente? | Proposito                         |
 | --------- | ---------------------------- | --------------------------------- |
-| `db`      | SÍ                           | PostgreSQL (siempre activo)       |
-| `backend` | SÍ                           | API Flask (siempre activo)        |
+| `db`      | Si                           | PostgreSQL (siempre activo)       |
+| `backend` | Si                           | API Flask (siempre activo)        |
 | `app`     | NO (profile: tools)          | Comandos manuales de Alembic      |
 | `init-db` | NO (profile: init)           | Inicializar BD (solo primera vez) |
 
-Los servicios con `profiles` solo se ejecutan cuando los invocas explícitamente.
+Los servicios con `profiles` solo se ejecutan cuando los invocas explicitamente.
 
 ## Migraciones de Base de Datos
 
 Este proyecto usa **Alembic** para gestionar el schema de la base de datos.
 
-### Crear una Migración
+### Crear una Migracion
 
 Cuando modifiques modelos en `src/models/models.py`:
 
 ```bash
-# Generar migración automáticamente
-docker-compose run --rm app alembic revision --autogenerate -m "Descripción del cambio"
+# Generar migracion automaticamente
+docker-compose run --rm app alembic revision --autogenerate -m "Descripcion del cambio"
 
-# Aplicar migración
+# Aplicar migracion
 docker-compose run --rm app alembic upgrade head
 ```
 
@@ -260,17 +260,17 @@ docker-compose run --rm app alembic upgrade head
 # Ver historial
 docker-compose run --rm app alembic history
 
-# Ver migración actual
+# Ver migracion actual
 docker-compose run --rm app alembic current
 ```
 
-### Revertir Migración
+### Revertir Migracion
 
 ```bash
-# Revertir última migración
+# Revertir última migracion
 docker-compose run --rm app alembic downgrade -1
 
-# Revertir a versión específica
+# Revertir a version especifica
 docker-compose run --rm app alembic downgrade <revision_id>
 ```
 
@@ -278,7 +278,7 @@ docker-compose run --rm app alembic downgrade <revision_id>
 
 El archivo `src/db/seed.py` puebla la base de datos con:
 
-- **Datos de Referencia**: Roles, Tipos de Local, Comunas, Tipos de Redes, Tipos de Fotos, Categorías
+- **Datos de Referencia**: Roles, Tipos de Local, Comunas, Tipos de Redes, Tipos de Fotos, Categorias
 - **Datos de Ejemplo**: 5 Direcciones y 5 Locales de prueba
 
 ### Ejecutar Seed Manualmente
@@ -331,16 +331,16 @@ Respuesta:
 ]
 ```
 
-## Tecnologías
+## Tecnologias
 
 - **Flask** 3.0.3 - Framework web
 - **SQLAlchemy** 2.0.29 - ORM
 - **Alembic** 1.17.2 - Migraciones de BD
-- **Pydantic** 2.12.4 - Validación de datos
+- **Pydantic** 2.12.4 - Validacion de datos
 - **PostgreSQL** 18 - Base de datos
 - **Docker** - Contenedores
 
-## Flujo de Inicialización
+## Flujo de Inicializacion
 
 ```mermaid
 graph TD
@@ -355,17 +355,17 @@ graph TD
 
 ## Notas
 
-- **Alembic** gestiona el schema (tablas, columnas, índices)
+- **Alembic** gestiona el schema (tablas, columnas, indices)
 - **Pydantic** valida datos de entrada/salida del API
-- Todos los comandos usan Docker, no requiere instalación local
+- Todos los comandos usan Docker, no requiere instalacion local
 - Los datos se persisten en el volumen `pgdata` de Docker
-- El backend se recarga automáticamente con cambios (hot-reload)
+- El backend se recarga automaticamente con cambios (hot-reload)
 
 ## Problemas Comunes
 
 ### Puerto 5432 en uso
 
-Si PostgreSQL ya está corriendo en tu máquina:
+Si PostgreSQL ya esta corriendo en tu maquina:
 
 ```bash
 # Detener PostgreSQL local (Windows)
@@ -379,11 +379,11 @@ ports:
 ### Permisos en scripts/init_db.sh
 
 ```bash
-# Dar permisos de ejecución (Linux/Mac)
+# Dar permisos de ejecucion (Linux/Mac)
 chmod +x scripts/init_db.sh
 ```
 
-### Errores de importación
+### Errores de importacion
 
 Asegúrate que `PYTHONPATH=/app/src` esté configurado en `docker-compose.yml`.
 

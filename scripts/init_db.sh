@@ -1,18 +1,18 @@
 #!/bin/bash
-# Script de inicialización de base de datos para Docker
+# Script de inicializacion de base de datos para Docker
 # Este script crea las tablas con Alembic y luego pobla datos iniciales
 
 set -e  # Salir si algún comando falla
 
-echo "Iniciando configuración de base de datos..."
+echo "Iniciando configuracion de base de datos..."
 
 # Esperar a que PostgreSQL esté listo (redundante con healthcheck, pero seguro)
 echo "⏳ Esperando PostgreSQL..."
 sleep 2
 
-# Crear migración inicial si no existe
+# Crear migracion inicial si no existe
 if [ ! -d "alembic/versions" ] || [ -z "$(ls -A alembic/versions)" ]; then
-    echo "Generando migración inicial..."
+    echo "Generando migracion inicial..."
     alembic revision --autogenerate -m "Migracion inicial"
 fi
 

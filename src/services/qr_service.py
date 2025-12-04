@@ -1,5 +1,5 @@
 """
-Servicio para generar códigos QR dinámicos para reservas y pedidos
+Servicio para generar codigos QR dinamicos para reservas y pedidos
 """
 import qrcode
 import base64
@@ -14,7 +14,7 @@ from models import QRDinamico, Reserva, Pedido, Mesa
 
 def generar_codigo_unico() -> str:
     """
-    Genera un código único alfanumérico para el QR
+    Genera un codigo único alfanumérico para el QR
     Formato: QR-XXXXXXXXXXXXXXXX (8 bytes = 16 caracteres hex)
     """
     codigo_hex = secrets.token_hex(8)
@@ -57,7 +57,7 @@ def crear_qr_reserva(
     minutos_tolerancia: int = 10
 ) -> Tuple[str, str]:
     """
-    Crea un QR dinámico para una reserva
+    Crea un QR dinamico para una reserva
     
     Args:
         id_reserva: ID de la reserva
@@ -70,7 +70,7 @@ def crear_qr_reserva(
     import logging
     logger = logging.getLogger(__name__)
     
-    logger.info(f"[QR Service] Iniciando creación de QR para reserva {id_reserva}")
+    logger.info(f"[QR Service] Iniciando creacion de QR para reserva {id_reserva}")
     
     # Verificar que la reserva existe
     reserva = db_session.query(Reserva).filter(Reserva.id == id_reserva).first()
@@ -86,16 +86,17 @@ def crear_qr_reserva(
     
     logger.info(f"[QR Service] Mesa encontrada: {mesa.nombre}")
     
-    # Generar código único
+    # Generar codigo único
     codigo = generar_codigo_unico()
-    logger.info(f"[QR Service] Código generado: {codigo}")
+    logger.info(f"[QR Service] Codigo generado: {codigo}")
     
-    # Calcular fecha de expiración: fecha+hora de reserva + tolerancia
+    # Calcular fecha de expiracion: fecha+hora de reserva + tolerancia
     # Combinar fecha y hora de la reserva
+    # pyrefly: ignore [bad-argument-type]
     fecha_hora_reserva = datetime.combine(reserva.fecha_reserva, reserva.hora_reserva)
     # Agregar los minutos de tolerancia
     expiracion = fecha_hora_reserva + timedelta(minutes=minutos_tolerancia)
-    logger.info(f"[QR Service] Expiración calculada: {expiracion}")
+    logger.info(f"[QR Service] Expiracion calculada: {expiracion}")
     
     # Crear registro en la base de datos
     qr_dinamico = QRDinamico(
@@ -111,8 +112,8 @@ def crear_qr_reserva(
     db_session.commit()
     logger.info(f"[QR Service] Registro guardado en BD con ID: {qr_dinamico.id}")
     
-    # Generar imagen QR con el código
-    # Incluir información útil en el QR
+    # Generar imagen QR con el codigo
+    # Incluir informacion útil en el QR
     qr_data = {
         "tipo": "reserva",
         "codigo": codigo,
@@ -142,12 +143,12 @@ def crear_qr_pedido(
     dias_expiracion: int = 1
 ) -> Tuple[str, str]:
     """
-    Crea un QR dinámico para un pedido
+    Crea un QR dinamico para un pedido
     
     Args:
         id_pedido: ID del pedido
         id_mesa: ID de la mesa asociada
-        dias_expiracion: Días hasta que expire el QR (default: 1 día)
+        dias_expiracion: Dias hasta que expire el QR (default: 1 dia)
     
     Returns:
         Tupla (codigo, qr_base64)
@@ -162,10 +163,11 @@ def crear_qr_pedido(
     if not mesa:
         raise ValueError(f"Mesa con ID {id_mesa} no encontrada")
     
-    # Generar código único
+    # Generar codigo único
     codigo = generar_codigo_unico()
     
-    # Calcular fecha de expiración
+    # Calcular fecha de expiracion
+    # pyrefly: ignore [deprecated]
     expiracion = datetime.utcnow() + timedelta(days=dias_expiracion)
     
     # Crear registro en la base de datos
@@ -181,7 +183,7 @@ def crear_qr_pedido(
     db_session.add(qr_dinamico)
     db_session.commit()
     
-    # Generar imagen QR con el código
+    # Generar imagen QR con el codigo
     import json
     qr_data = {
         "tipo": "pedido",
@@ -199,13 +201,13 @@ def crear_qr_pedido(
 
 def validar_qr(codigo: str) -> Optional[QRDinamico]:
     """
-    Valida un código QR y verifica que esté activo y no haya expirado
+    Valida un codigo QR y verifica que esté activo y no haya expirado
     
     Args:
-        codigo: Código del QR a validar
+        codigo: Codigo del QR a validar
     
     Returns:
-        QRDinamico si es válido, None si no es válido
+        QRDinamico si es valido, None si no es valido
     """
     qr = db_session.query(QRDinamico).filter(QRDinamico.codigo == codigo).first()
     
@@ -217,6 +219,7 @@ def validar_qr(codigo: str) -> Optional[QRDinamico]:
         return None
     
     # Verificar que no haya expirado
+    # pyrefly: ignore [deprecated]
     if qr.expiracion and qr.expiracion < datetime.utcnow():
         return None
     
@@ -225,19 +228,20 @@ def validar_qr(codigo: str) -> Optional[QRDinamico]:
 
 def desactivar_qr(codigo: str) -> bool:
     """
-    Desactiva un código QR
+    Desactiva un codigo QR
     
     Args:
-        codigo: Código del QR a desactivar
+        codigo: Codigo del QR a desactivar
     
     Returns:
-        True si se desactivó exitosamente, False si no se encontró
+        True si se desactivo exitosamente, False si no se encontro
     """
     qr = db_session.query(QRDinamico).filter(QRDinamico.codigo == codigo).first()
     
     if not qr:
         return False
     
+    # pyrefly: ignore [bad-assignment]
     qr.activo = False
     db_session.commit()
     

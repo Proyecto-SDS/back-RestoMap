@@ -1,6 +1,6 @@
 """
-Configuración de la base de datos PostgreSQL
-Gestiona la conexión, engine y sesiones de SQLAlchemy
+Configuracion de la base de datos PostgreSQL
+Gestiona la conexion, engine y sesiones de SQLAlchemy
 """
 import os
 from dotenv import load_dotenv
@@ -22,17 +22,18 @@ DB_NAME = os.getenv("DB_NAME")
 # Usamos '5432' por defecto si no existe la variable, para evitar errores en Cloud Run
 DB_PORT = os.getenv("DB_PORT", "5432") 
 
-# Validar solo las variables CRÍTICAS (Quitamos DB_PORT de la validación obligatoria)
+# Validar solo las variables CRiTICAS (Quitamos DB_PORT de la validacion obligatoria)
 if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
-    raise ValueError("Faltan variables de entorno críticas (DB_USER, DB_PASSWORD, DB_HOST o DB_NAME).")
+    raise ValueError("Faltan variables de entorno criticas (DB_USER, DB_PASSWORD, DB_HOST o DB_NAME).")
 
-# --- LÓGICA DE CONEXIÓN HÍBRIDA (CLOUD RUN vs LOCAL) ---
+# --- LoGICA DE CONEXIoN HiBRIDA (CLOUD RUN vs LOCAL) ---
+# pyrefly: ignore [missing-attribute]
 if DB_HOST.startswith("/cloudsql"):
-    # Conexión vía Unix Socket (Para Cloud Run)
+    # Conexion via Unix Socket (Para Cloud Run)
     # Formato: postgresql://user:pass@/dbname?host=/cloudsql/instance
     DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@/{DB_NAME}?host={DB_HOST}"
 else:
-    # Conexión vía TCP (Para Local)
+    # Conexion via TCP (Para Local)
     # Formato: postgresql://user:pass@host:port/dbname
     DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
@@ -43,10 +44,10 @@ engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 # Crear SessionLocal (factory de sesiones)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
-# Crear sesión global con scoped_session (thread-safe)
+# Crear sesion global con scoped_session (thread-safe)
 db_session = scoped_session(SessionLocal)
 
-# Función helper para obtener sesiones en otros contextos
+# Funcion helper para obtener sesiones en otros contextos
 def get_db():
     """
     Generador de sesiones para usar en dependencias o contextos.

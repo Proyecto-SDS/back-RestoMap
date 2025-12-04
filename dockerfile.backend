@@ -20,10 +20,10 @@ COPY requirements.txt .
 # Instalar dependencias Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código
+# Copiar codigo
 COPY . .
 
-# Establecer PYTHONPATH para que Python encuentre los módulos en src
+# Establecer PYTHONPATH para que Python encuentre los modulos en src
 ENV PYTHONPATH=/app/src
 
 # Comando por defecto (ajustado a la nueva estructura)

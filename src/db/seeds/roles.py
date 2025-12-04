@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 def create_roles(db):
     logger.info("  → Insertando Roles...")
     if db.query(Rol).count() > 0:
-        logger.info("    ⚠ Roles ya existen, saltando...")
+        logger.info("    Roles ya existen, saltando...")
         return
 
     db.add_all([

@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 def create_users(db):
     logger.info("  → Insertando Usuarios de ejemplo...")
     if db.query(Usuario).count() > 0:
-        logger.info("    ⚠ Usuarios ya existen, saltando...")
+        logger.info("    Usuarios ya existen, saltando...")
         return
 
     # Hash para password: test123
@@ -18,7 +18,7 @@ def create_users(db):
         Usuario(id_rol=5, nombre="Juan Pérez", correo="juan@test.cl", 
                contrasena=password_hash, 
                telefono="987654321"),
-        Usuario(id_rol=5, nombre="María González", correo="maria@test.cl", 
+        Usuario(id_rol=5, nombre="Maria Gonzalez", correo="maria@test.cl", 
                contrasena=password_hash, 
                telefono="955556666"),
         Usuario(id_rol=4, nombre="Carlos Mesero", correo="mesero@test.cl", 

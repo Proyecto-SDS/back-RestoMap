@@ -6,5 +6,16 @@
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true
+  },
+  // Configuracion de Pyrefly Type Checker
+  "pyrefly.enabled": true,
+  "pyrefly.autocheck": true,
+  "pyrefly.configFile": "pyrefly.toml",
+  // Configuracion de Python
+  "python.languageServer": "Pylance",
+  "python.analysis.typeCheckingMode": "off",
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.rulers": [88, 120]
   }
 }

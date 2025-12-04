@@ -27,17 +27,17 @@ if config.config_file_name is not None:
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST") # En Cloud Run será: /cloudsql/proyecto:region:instancia
+DB_HOST = os.getenv("DB_HOST") # En Cloud Run sera: /cloudsql/proyecto:region:instancia
 DB_PORT = os.getenv("DB_PORT", "5432") # Valor por defecto por seguridad
 DB_NAME = os.getenv("DB_NAME")
 
-# LÓGICA HÍBRIDA (La solución)
+# LoGICA HiBRIDA (La solucion)
 if DB_HOST and DB_HOST.startswith("/cloudsql"):
-    # Conexión vía Unix Socket (Para Cloud Run)
+    # Conexion via Unix Socket (Para Cloud Run)
     # Nota el formato: @/{DB_NAME}?host={DB_HOST}
     DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@/{DB_NAME}?host={DB_HOST}"
 else:
-    # Conexión vía TCP (Para Localhost)
+    # Conexion via TCP (Para Localhost)
     DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Asignar la URL generada

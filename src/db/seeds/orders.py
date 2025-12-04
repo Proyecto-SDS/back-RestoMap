@@ -16,12 +16,12 @@ def create_orders(db):
             local_id=1, mesa_id=3, usuario_id=2,
             estado=EstadoPedidoEnum.ABIERTO, total=14000
         )
-        # Pedido en preparación
+        # Pedido en preparacion
         pedido2 = Pedido(
             local_id=1, mesa_id=4, usuario_id=3,
             estado=EstadoPedidoEnum.EN_PREPARACION, total=25300
         )
-        # Pedido cerrado (histórico)
+        # Pedido cerrado (historico)
         pedido3 = Pedido(
             local_id=2, mesa_id=7, usuario_id=2,
             estado=EstadoPedidoEnum.CERRADO, total=18500,
@@ -68,7 +68,7 @@ def create_orders(db):
             estado=EstadoPagoEnum.COBRADO, monto=18500,
             creado_el=datetime.now() - timedelta(days=1)
         ))
-        # Pago pendiente para pedido en preparación
+        # Pago pendiente para pedido en preparacion
         db.add(Pago(
             pedido_id=2, metodo=MetodoPagoEnum.EFECTIVO,
             estado=EstadoPagoEnum.PENDIENTE, monto=25300
@@ -96,7 +96,7 @@ def create_orders(db):
             
             logger.info("    ✓ Encomiendas insertadas")
         else:
-            logger.info("    ⚠ No se pudo insertar Encomienda (no hay pedidos)")
+            logger.info("    No se pudo insertar Encomienda (no hay pedidos)")
 
     else:
-        logger.info("    ⚠ Pedidos ya existen")
+        logger.info("    Pedidos ya existen")

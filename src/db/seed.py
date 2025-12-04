@@ -1,23 +1,23 @@
 """
 Script de Seed (Datos Iniciales)
 Puebla la base de datos con datos de referencia y ejemplos de testing
-Versión optimizada para Cloud Run y Docker
+Version optimizada para Cloud Run y Docker
 """
 import sys
 import os
 import logging
 from dotenv import load_dotenv
 
-# --- 1. CONFIGURACIÓN DE RUTAS (CRUCIAL PARA CLOUD RUN) ---
+# --- 1. CONFIGURACIoN DE RUTAS (CRUCIAL PARA CLOUD RUN) ---
 # Obtenemos la ruta absoluta de este archivo (src/db/seed.py)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # Obtenemos la ruta 'src' (padre de db)
 src_dir = os.path.dirname(current_dir)
-# Agregamos 'src' al path de Python si no está
+# Agregamos 'src' al path de Python si no esta
 if src_dir not in sys.path:
     sys.path.append(src_dir)
 
-# Configuración de Logging (para que se vea bien en Google Cloud)
+# Configuracion de Logging (para que se vea bien en Google Cloud)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 
 try:
     # --- 2. IMPORTACIONES ---
-    # Importamos la fábrica de sesiones desde database.py
+    # Importamos la fabrica de sesiones desde database.py
     from database import SessionLocal, engine, Base
     
     # Importamos las funciones de seed
     # Intentamos importar desde 'seeds' (si corremos en src/db) o 'db.seeds' (si corremos en src)
     try:
+        # pyrefly: ignore [missing-import]
         from seeds import (
             create_roles, create_catalogs, create_users, create_locals,
             create_products, create_interactions, create_reservations,
@@ -45,8 +46,8 @@ try:
         )
 
 except ImportError as e:
-    logger.error(f"Error crítico de importación: {e}")
-    logger.error("Asegúrate de que estás ejecutando esto con PYTHONPATH=/app/src o desde la raíz correcta.")
+    logger.error(f"Error critico de importacion: {e}")
+    logger.error("Asegúrate de que estas ejecutando esto con PYTHONPATH=/app/src o desde la raiz correcta.")
     sys.exit(1)
 
 def seed_database():

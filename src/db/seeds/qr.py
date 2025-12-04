@@ -5,11 +5,11 @@ from models import QRDinamico, Pedido, Reserva, ReservaMesa, EstadoPedidoEnum, E
 logger = logging.getLogger(__name__)
 
 def create_qrs(db):
-    # ============ QR Dinámicos ============
-    logger.info("  → Insertando QR Dinámicos de ejemplo...")
+    # ============ QR Dinamicos ============
+    logger.info("  → Insertando QR Dinamicos de ejemplo...")
     
     if db.query(QRDinamico).count() > 0:
-        logger.info("    ⚠ QR Dinámicos ya existen")
+        logger.info("    QR Dinamicos ya existen")
         return
 
     qrs_to_add = []
@@ -50,7 +50,7 @@ def create_qrs(db):
                 activo=True
             ))
 
-    # 3. QR para un Pedido en Preparación
+    # 3. QR para un Pedido en Preparacion
     pedido_prep = db.query(Pedido).filter(
         Pedido.estado == EstadoPedidoEnum.EN_PREPARACION,
         Pedido.mesa_id.isnot(None)
@@ -69,6 +69,6 @@ def create_qrs(db):
     if qrs_to_add:
         db.add_all(qrs_to_add)
         db.commit()
-        logger.info(f"    ✓ {len(qrs_to_add)} QR Dinámicos insertados correctamente")
+        logger.info(f"    ✓ {len(qrs_to_add)} QR Dinamicos insertados correctamente")
     else:
-        logger.info("    ⚠ No se pudieron generar QRs (faltan pedidos/reservas base)")
+        logger.info("    No se pudieron generar QRs (faltan pedidos/reservas base)")

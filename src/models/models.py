@@ -1,7 +1,7 @@
 """
 ========================================
 MODELOS SQLALCHEMY COMPLETOS + ENUMS
-Sistema de Gestión de Locales, Pedidos y Reservas
+Sistema de Gestion de Locales, Pedidos y Reservas
 Compatible con: Flask, SQLAlchemy, PostgreSQL, Pydantic v2
 ========================================
 """
@@ -19,14 +19,14 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field, EmailStr, validator
 
 # ============================================
-# CONFIGURACIÓN BASE
+# CONFIGURACIoN BASE
 # ============================================
 
 # Importar Base desde database.py (no crear una nueva)
 from database import Base
 
 # ============================================
-# ENUMS - SECCIÓN 1: PAGO
+# ENUMS - SECCIoN 1: PAGO
 # ============================================
 
 class MetodoPagoEnum(str, PyEnum):
@@ -65,7 +65,7 @@ class EstadoPagoEnum(str, PyEnum):
         ]
 
 # ============================================
-# ENUMS - SECCIÓN 2: PEDIDO
+# ENUMS - SECCIoN 2: PEDIDO
 # ============================================
 
 class EstadoPedidoEnum(str, PyEnum):
@@ -80,7 +80,7 @@ class EstadoPedidoEnum(str, PyEnum):
     def choices(cls) -> List[tuple]:
         return [
             (cls.ABIERTO, "Abierto"),
-            (cls.EN_PREPARACION, "En Preparación"),
+            (cls.EN_PREPARACION, "En Preparacion"),
             (cls.SERVIDO, "Servido"),
             (cls.CERRADO, "Cerrado"),
             (cls.CANCELADO, "Cancelado"),
@@ -92,7 +92,7 @@ class EstadoPedidoEnum(str, PyEnum):
         return estado not in [cls.CERRADO, cls.CANCELADO]
 
 # ============================================
-# ENUMS - SECCIÓN 3: MESA Y RESERVA
+# ENUMS - SECCIoN 3: MESA Y RESERVA
 # ============================================
 
 class EstadoMesaEnum(str, PyEnum):
@@ -145,7 +145,7 @@ class EstadoReservaMesaEnum(str, PyEnum):
         ]
 
 # ============================================
-# ENUMS - SECCIÓN 4: PRODUCTO Y ENCOMIENDA
+# ENUMS - SECCIoN 4: PRODUCTO Y ENCOMIENDA
 # ============================================
 
 class EstadoProductoEnum(str, PyEnum):
@@ -179,14 +179,14 @@ class EstadoEncomiendaEnum(str, PyEnum):
     def choices(cls) -> List[tuple]:
         return [
             (cls.PENDIENTE, "Pendiente"),
-            (cls.EN_PREPARACION, "En Preparación"),
+            (cls.EN_PREPARACION, "En Preparacion"),
             (cls.LISTA, "Lista"),
             (cls.ENTREGADA, "Entregada"),
             (cls.CANCELADA, "Cancelada"),
         ]
 
 # ============================================
-# ENUMS - SECCIÓN 5: ADICIONALES
+# ENUMS - SECCIoN 5: ADICIONALES
 # ============================================
 
 class RolEnum(str, PyEnum):
@@ -235,7 +235,7 @@ def obtener_etiqueta(enum_class, valor: str) -> str:
     return valor
 
 def obtener_colores_estado(enum_value) -> Dict[str, str]:
-    """Retorna color y ícono para mostrar estados en frontend"""
+    """Retorna color y icono para mostrar estados en frontend"""
     color_map = {
         # Pedidos
         EstadoPedidoEnum.ABIERTO: {"color": "blue", "icono": "🟦", "label": "Abierto"},
@@ -246,7 +246,7 @@ def obtener_colores_estado(enum_value) -> Dict[str, str]:
         
         # Mesas
         EstadoMesaEnum.DISPONIBLE: {"color": "green", "icono": "", "label": "Disponible"},
-        EstadoMesaEnum.RESERVADA: {"color": "yellow", "icono": "⚠", "label": "Reservada"},
+        EstadoMesaEnum.RESERVADA: {"color": "yellow", "icono": "", "label": "Reservada"},
         EstadoMesaEnum.OCUPADA: {"color": "orange", "icono": "", "label": "Ocupada"},
         EstadoMesaEnum.FUERA_DE_SERVICIO: {"color": "red", "icono": "", "label": "Fuera de Servicio"},
     }
@@ -254,7 +254,7 @@ def obtener_colores_estado(enum_value) -> Dict[str, str]:
     return color_map.get(enum_value, {"color": "gray", "icono": "", "label": str(enum_value)})
 
 def validar_transicion_estado(estado_actual, estado_nuevo, enum_class) -> bool:
-    """Valida si la transición de estados es permitida"""
+    """Valida si la transicion de estados es permitida"""
     transiciones_validas = {
         EstadoPedidoEnum: {
             EstadoPedidoEnum.ABIERTO: [EstadoPedidoEnum.EN_PREPARACION, EstadoPedidoEnum.CANCELADO],
@@ -330,7 +330,7 @@ class Categoria(Base):
     fotos = relationship("Foto", back_populates="categoria", lazy="selectin")
 
 # ============================================
-# UBICACIÓN
+# UBICACIoN
 # ============================================
 
 class Direccion(Base):
@@ -347,7 +347,7 @@ class Direccion(Base):
     comuna = relationship("Comuna", back_populates="direcciones", lazy="joined")
 
 # ============================================
-# LOCALES Y CONFIGURACIÓN
+# LOCALES Y CONFIGURACIoN
 # ============================================
 
 class Local(Base):
@@ -404,7 +404,7 @@ class Mesa(Base):
     qr_dinamicos = relationship("QRDinamico", back_populates="mesa", lazy="select", cascade="all, delete-orphan")
 
 # ============================================
-# USUARIOS Y AUTENTICACIÓN
+# USUARIOS Y AUTENTICACIoN
 # ============================================
 
 class Usuario(Base):
@@ -460,7 +460,7 @@ class Redes(Base):
     tipo_red = relationship("TipoRed", back_populates="redes", lazy="joined")
 
 # ============================================
-# CATÁLOGO DE PRODUCTOS
+# CATaLOGO DE PRODUCTOS
 # ============================================
 
 class Producto(Base):
@@ -603,7 +603,7 @@ class EstadoPedido(Base):
     creado_por_usuario = relationship("Usuario", back_populates="estados_pedido", lazy="joined", foreign_keys=[creado_por])
 
 # ============================================
-# QR DINÁMICO
+# QR DINaMICO
 # ============================================
 
 class QRDinamico(Base):

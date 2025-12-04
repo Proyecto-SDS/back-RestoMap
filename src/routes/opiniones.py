@@ -17,7 +17,7 @@ opiniones_bp = Blueprint('opiniones', __name__, url_prefix='/api/opiniones')
 @requerir_auth
 def crear_opinion(user_id, user_rol):
     """
-    Crear nueva opinión para un local
+    Crear nueva opinion para un local
     
     Headers:
         Authorization: Bearer {token}
@@ -32,7 +32,7 @@ def crear_opinion(user_id, user_rol):
     Response 201:
         {
             "success": true,
-            "message": "Opinión creada exitosamente",
+            "message": "Opinion creada exitosamente",
             "opinion": {
                 "id": 1,
                 "localId": "1",
@@ -45,9 +45,9 @@ def crear_opinion(user_id, user_rol):
         
     Response 400:
         {"error": "localId, puntuacion y comentario son requeridos"}
-        {"error": "La puntuación debe estar entre 1 y 5"}
+        {"error": "La puntuacion debe estar entre 1 y 5"}
         {"error": "El comentario debe tener entre 10 y 500 caracteres"}
-        {"error": "Ya tienes una opinión para este local"}
+        {"error": "Ya tienes una opinion para este local"}
         
     Response 404:
         {"error": "Local no encontrado"}
@@ -69,13 +69,13 @@ def crear_opinion(user_id, user_rol):
         except ValueError:
             return jsonify({'error': 'localId debe ser un número'}), 400
         
-        # Validar puntuación
+        # Validar puntuacion
         try:
             puntuacion = float(puntuacion)
             if puntuacion < 1 or puntuacion > 5:
-                return jsonify({'error': 'La puntuación debe estar entre 1 y 5'}), 400
+                return jsonify({'error': 'La puntuacion debe estar entre 1 y 5'}), 400
         except (ValueError, TypeError):
-            return jsonify({'error': 'Puntuación inválida'}), 400
+            return jsonify({'error': 'Puntuacion invalida'}), 400
         
         # Validar comentario
         if len(comentario) < 10 or len(comentario) > 500:
@@ -86,7 +86,7 @@ def crear_opinion(user_id, user_rol):
         if not local:
             return jsonify({'error': 'Local no encontrado'}), 404
         
-        # Verificar que el usuario no tenga ya una opinión para este local
+        # Verificar que el usuario no tenga ya una opinion para este local
         opinion_existente = db_session.query(Opinion)\
             .filter(
                 Opinion.id_usuario == user_id,
@@ -96,9 +96,9 @@ def crear_opinion(user_id, user_rol):
             .first()
         
         if opinion_existente:
-            return jsonify({'error': 'Ya tienes una opinión para este local'}), 400
+            return jsonify({'error': 'Ya tienes una opinion para este local'}), 400
         
-        # Crear nueva opinión
+        # Crear nueva opinion
         nueva_opinion = Opinion(
             id_usuario=user_id,
             id_local=local_id,
@@ -117,11 +117,12 @@ def crear_opinion(user_id, user_rol):
         
         return jsonify({
             'success': True,
-            'message': 'Opinión creada exitosamente',
+            'message': 'Opinion creada exitosamente',
             'opinion': {
                 'id': nueva_opinion.id,
                 'localId': str(local_id),
                 'usuario': usuario_nombre,
+                # pyrefly: ignore [bad-argument-type]
                 'puntuacion': float(nueva_opinion.puntuacion),
                 'comentario': nueva_opinion.comentario,
                 'fecha': nueva_opinion.creado_el.isoformat()
@@ -132,7 +133,7 @@ def crear_opinion(user_id, user_rol):
         db_session.rollback()
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Error al crear la opinión'}), 500
+        return jsonify({'error': 'Error al crear la opinion'}), 500
 
 
 @opiniones_bp.route('/mis-opiniones', methods=['GET'])
@@ -174,6 +175,7 @@ def obtener_mis_opiniones(user_id, user_rol):
                 'id': opinion.id,
                 'localId': str(opinion.id_local),
                 'localNombre': opinion.local.nombre if opinion.local else 'Local',
+                # pyrefly: ignore [bad-argument-type]
                 'puntuacion': float(opinion.puntuacion),
                 'comentario': opinion.comentario,
                 'fecha': opinion.creado_el.isoformat() if opinion.creado_el else None
@@ -191,7 +193,7 @@ def obtener_mis_opiniones(user_id, user_rol):
 @requerir_auth
 def obtener_opinion_usuario(local_id, user_id, user_rol):
     """
-    Obtener la opinión del usuario autenticado para un local específico
+    Obtener la opinion del usuario autenticado para un local especifico
     
     Headers:
         Authorization: Bearer {token}
@@ -207,7 +209,7 @@ def obtener_opinion_usuario(local_id, user_id, user_rol):
         }
         
     Response 404:
-        {"error": "No tienes opinión para este local"}
+        {"error": "No tienes opinion para este local"}
     """
     try:
         opinion = db_session.query(Opinion)\
@@ -220,12 +222,13 @@ def obtener_opinion_usuario(local_id, user_id, user_rol):
             .first()
         
         if not opinion:
-            return jsonify({'error': 'No tienes opinión para este local'}), 404
+            return jsonify({'error': 'No tienes opinion para este local'}), 404
         
         return jsonify({
             'id': opinion.id,
             'localId': str(local_id),
             'usuario': opinion.usuario.nombre if opinion.usuario else 'Usuario',
+            # pyrefly: ignore [bad-argument-type]
             'puntuacion': float(opinion.puntuacion),
             'comentario': opinion.comentario,
             'fecha': opinion.creado_el.isoformat() if opinion.creado_el else None
@@ -234,4 +237,4 @@ def obtener_opinion_usuario(local_id, user_id, user_rol):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Error al obtener la opinión'}), 500
+        return jsonify({'error': 'Error al obtener la opinion'}), 500

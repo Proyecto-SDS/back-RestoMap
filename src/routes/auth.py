@@ -1,10 +1,11 @@
 """
-Rutas de autenticación
+Rutas de autenticacion
 Endpoints: /api/auth/*
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+# pyrefly: ignore [missing-import]
 import bcrypt
 import logging
 
@@ -18,7 +19,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
 def get_db():
-    """Obtener sesión de base de datos"""
+    """Obtener sesion de base de datos"""
     db = SessionLocal()
     try:
         yield db
@@ -29,7 +30,7 @@ def get_db():
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """
-    Iniciar sesión con correo y contraseña
+    Iniciar sesion con correo y contraseña
     
     Body:
         {
@@ -135,7 +136,7 @@ def register():
         
     Response 400:
         {"error": "Todos los campos son requeridos"}
-        {"error": "Este correo ya está registrado"}
+        {"error": "Este correo ya esta registrado"}
     """
     try:
         data = request.get_json()
@@ -156,7 +157,7 @@ def register():
         # Limpiar teléfono (remover +56 si existe)
         telefono_limpio = telefono.replace('+56', '').replace(' ', '').replace('-', '')
         if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
-            return jsonify({'error': 'Teléfono inválido. Debe tener 9 dígitos'}), 400
+            return jsonify({'error': 'Teléfono invalido. Debe tener 9 digitos'}), 400
         
         db = next(get_db())
         
@@ -166,7 +167,7 @@ def register():
         ).scalar_one_or_none()
         
         if usuario_existente:
-            return jsonify({'error': 'Este correo ya está registrado'}), 400
+            return jsonify({'error': 'Este correo ya esta registrado'}), 400
         
         # Hash de contraseña con bcrypt
         hashed_password = bcrypt.hashpw(contrasena.encode('utf-8'), bcrypt.gensalt())
@@ -208,7 +209,7 @@ def register():
 @requerir_auth
 def logout(user_id, user_rol):
     """
-    Cerrar sesión (actualmente solo responde exitosamente)
+    Cerrar sesion (actualmente solo responde exitosamente)
     
     En el futuro se puede implementar blacklist de tokens
     
@@ -216,11 +217,11 @@ def logout(user_id, user_rol):
         Authorization: Bearer {token}
         
     Response 200:
-        {"success": true, "message": "Sesión cerrada"}
+        {"success": true, "message": "Sesion cerrada"}
     """
     return jsonify({
         'success': True,
-        'message': 'Sesión cerrada exitosamente'
+        'message': 'Sesion cerrada exitosamente'
     }), 200
 
 
@@ -303,7 +304,7 @@ def update_profile(user_id, user_rol):
         }
         
     Response 400:
-        {"error": "Teléfono inválido"}
+        {"error": "Teléfono invalido"}
     """
     try:
         data = request.get_json()
@@ -332,7 +333,7 @@ def update_profile(user_id, user_rol):
         if telefono:
             telefono_limpio = telefono.replace('+56', '').replace(' ', '').replace('-', '')
             if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
-                return jsonify({'error': 'Teléfono inválido. Debe tener 9 dígitos'}), 400
+                return jsonify({'error': 'Teléfono invalido. Debe tener 9 digitos'}), 400
             usuario.telefono = int(telefono_limpio)
         
         db.commit()

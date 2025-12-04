@@ -1,0 +1,148 @@
+# ========================================
+# Configuracion de Pyrefly Type Checker
+# Sistema de Gestion de Locales - Backend
+# ========================================
+
+# Directorios a incluir en el analisis de tipos
+project-includes = ["src"]
+
+# Directorios a excluir del analisis
+project-excludes = [
+    ".venv",
+    "venv",
+    "alembic",
+    "scripts",
+    "__pycache__",
+    ".git",
+    ".github",
+    "*.egg-info"
+]
+
+# Version de Python objetivo
+python-version = "3.11"
+
+# Ruta al intérprete de Python
+python-interpreter-path = ".venv/Scripts/python.exe"
+
+# No deshabilitar errores de tipo en el IDE
+disable-type-errors-in-ide = false
+
+# Comportamiento para funciones sin type hints
+# "check-and-infer-return-type" = analizar y inferir tipo de retorno
+# "check-and-infer-return-any" = analizar y retornar Any si no se puede inferir
+# "skip-and-infer-return-any" = no analizar funciones sin tipos
+untyped-def-behavior = "check-and-infer-return-any"
+
+# ========================================
+# Configuracion de Errores
+# ========================================
+[errors]
+# --- ERRORES CRiTICOS (Siempre habilitados) ---
+# Errores de argumentos
+bad-argument-type = true
+bad-argument-count = true
+missing-argument = true
+unexpected-keyword = true
+unexpected-positional-argument = true
+
+# Errores de retorno
+bad-return = true
+
+# Errores de atributos y llamadas
+missing-attribute = true
+not-callable = true
+no-access = true
+
+# Errores de asignacion
+bad-assignment = true
+
+# Errores de indices y operaciones
+bad-index = true
+unsupported-operation = true
+
+# --- ERRORES IMPORTANTES (Habilitados) ---
+# Tipos invalidos
+invalid-annotation = true
+not-a-type = true
+
+# Overrides incorrectos
+bad-override = true
+
+# Instanciacion incorrecta
+bad-instantiation = true
+
+# --- ERRORES MEDIOS (Habilitados con precaucion) ---
+# TypedDict
+bad-typed-dict = true
+bad-typed-dict-key = true
+
+# Context managers
+bad-context-manager = true
+
+# Raises
+bad-raise = true
+
+# --- ERRORES DE CoDIGO AVANZADO (Deshabilitados inicialmente) ---
+# Estos pueden generar mucho ruido en codigo existente
+# Activalos gradualmente cuando estés listo
+
+# Any implicito - genera muchas advertencias en codigo sin tipos
+implicit-any = false
+
+# Imports sin tipos - común en librerias sin stubs
+untyped-import = false
+
+# Imports implicitos
+implicit-import = false
+
+# Atributos definidos implicitamente (fuera de __init__)
+implicitly-defined-attribute = false
+
+# --- ERRORES DE CALIDAD DE CoDIGO (Opcional) ---
+# Codigo redundante - útil pero puede ser molesto
+redundant-cast = false
+redundant-condition = false
+
+# Codigo deprecated
+deprecated = true
+
+# Corutinas no usadas
+unused-coroutine = true
+
+# --- ERRORES DE DEFINICIoN (Habilitados) ---
+bad-class-definition = true
+bad-function-definition = true
+invalid-inheritance = true
+inconsistent-inheritance = true
+
+# --- ERRORES DE SINTAXIS (Siempre habilitados) ---
+parse-error = true
+invalid-syntax = true
+
+# --- ERRORES DE NOMBRES (Habilitados) ---
+unbound-name = true
+unknown-name = true
+redefinition = true
+
+# ========================================
+# Notas de Uso
+# ========================================
+# 
+# Comandos útiles:
+# 
+# 1. Verificar todo el proyecto:
+#    pyrefly check
+#
+# 2. Ver resumen de errores:
+#    pyrefly check --summarize-errors
+#
+# 3. Suprimir todos los errores existentes:
+#    pyrefly check --suppress-errors
+#
+# 4. Eliminar suppressions no usados:
+#    pyrefly check --remove-unused-ignores
+#
+# 5. Verificar un archivo especifico:
+#    pyrefly check src/main.py
+#
+# ========================================

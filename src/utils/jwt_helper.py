@@ -1,7 +1,8 @@
 """
-Utilidades para manejo de JWT y autenticación
+Utilidades para manejo de JWT y autenticacion
 """
 import os
+# pyrefly: ignore [missing-import]
 import jwt
 from datetime import datetime, timedelta
 from functools import wraps
@@ -27,7 +28,9 @@ def crear_token(user_id: int, rol: str) -> str:
     payload = {
         'user_id': user_id,
         'rol': rol,
+        # pyrefly: ignore [deprecated]
         'exp': datetime.utcnow() + timedelta(days=TOKEN_EXPIRATION_DAYS),
+        # pyrefly: ignore [deprecated]
         'iat': datetime.utcnow()
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -41,7 +44,7 @@ def verificar_token(token: str) -> dict | None:
         token: Token JWT a verificar
         
     Returns:
-        Payload del token si es válido, None si es inválido o expirado
+        Payload del token si es valido, None si es invalido o expirado
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -54,7 +57,7 @@ def verificar_token(token: str) -> dict | None:
 
 def requerir_auth(f):
     """
-    Decorator para proteger rutas que requieren autenticación
+    Decorator para proteger rutas que requieren autenticacion
     
     Usage:
         @app.route('/api/protected')
@@ -73,16 +76,16 @@ def requerir_auth(f):
         # Verificar formato "Bearer {token}"
         parts = auth_header.split()
         if len(parts) != 2 or parts[0].lower() != 'bearer':
-            return jsonify({'error': 'Formato de token inválido. Use: Bearer {token}'}), 401
+            return jsonify({'error': 'Formato de token invalido. Use: Bearer {token}'}), 401
         
         token = parts[1]
         
         # Verificar token
         payload = verificar_token(token)
         if not payload:
-            return jsonify({'error': 'Token inválido o expirado'}), 401
+            return jsonify({'error': 'Token invalido o expirado'}), 401
         
-        # Agregar user_id y user_rol al contexto de la función
+        # Agregar user_id y user_rol al contexto de la funcion
         kwargs['user_id'] = payload['user_id']
         kwargs['user_rol'] = payload['rol']
         
@@ -93,7 +96,7 @@ def requerir_auth(f):
 
 def requerir_rol(*roles_permitidos):
     """
-    Decorator para proteger rutas que requieren roles específicos
+    Decorator para proteger rutas que requieren roles especificos
     
     Args:
         *roles_permitidos: Roles que pueden acceder (ej: 'dueno', 'administrador')

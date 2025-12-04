@@ -37,4 +37,3 @@ docker-compose.override.yml
 
 # Bases de datos locales
 *.db
-*.sql

@@ -34,4 +34,4 @@ def create_reservations(db):
         db.commit()
         logger.info("    ✓ Reservas insertadas")
     else:
-        logger.info("    ⚠ Reservas ya existen")
+        logger.info("    Reservas ya existen")

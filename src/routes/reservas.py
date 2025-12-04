@@ -53,7 +53,7 @@ def crear_reserva(user_id, user_rol):
         
     Response 400:
         {"error": "localId, mesaId, fecha y hora son requeridos"}
-        {"error": "Formato de fecha inválido"}
+        {"error": "Formato de fecha invalido"}
         {"error": "La fecha debe ser futura"}
         {"error": "Mesa no disponible para esta fecha y hora"}
         
@@ -85,13 +85,13 @@ def crear_reserva(user_id, user_rol):
         try:
             fecha_reserva = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
-            return jsonify({'error': 'Formato de fecha inválido. Use: YYYY-MM-DD'}), 400
+            return jsonify({'error': 'Formato de fecha invalido. Use: YYYY-MM-DD'}), 400
         
         # Parsear hora
         try:
             hora_reserva = datetime.strptime(hora_str, '%H:%M').time()
         except ValueError:
-            return jsonify({'error': 'Formato de hora inválido. Use: HH:MM'}), 400
+            return jsonify({'error': 'Formato de hora invalido. Use: HH:MM'}), 400
         
         # Validar que la fecha sea futura (o hoy)
         if fecha_reserva < date.today():
@@ -152,7 +152,7 @@ def crear_reserva(user_id, user_rol):
         db_session.add(nueva_reserva)
         db_session.flush()  # Para obtener el ID
         
-        # Crear relación reserva-mesa
+        # Crear relacion reserva-mesa
         reserva_mesa = ReservaMesa(
             id_reserva=nueva_reserva.id,
             id_mesa=mesa_id,
@@ -162,24 +162,25 @@ def crear_reserva(user_id, user_rol):
         db_session.add(reserva_mesa)
         db_session.commit()
         
-        # Generar QR dinámico para la reserva
+        # Generar QR dinamico para la reserva
         import logging
         logger = logging.getLogger(__name__)
         
         try:
             logger.info(f"[DEBUG] Generando QR para reserva {nueva_reserva.id}, mesa {mesa_id}")
             codigo_qr, qr_base64 = crear_qr_reserva(
+                # pyrefly: ignore [bad-argument-type]
                 id_reserva=nueva_reserva.id,
                 id_mesa=mesa_id,
                 minutos_tolerancia=10  # Expira 10 minutos después de la hora de reserva
             )
-            logger.info(f"[DEBUG] QR generado exitosamente. Código: {codigo_qr}")
+            logger.info(f"[DEBUG] QR generado exitosamente. Codigo: {codigo_qr}")
             logger.info(f"[DEBUG] QR base64 length: {len(qr_base64) if qr_base64 else 0}")
         except Exception as e:
             import traceback
             logger.error(f"[ERROR] Fallo al generar QR: {str(e)}")
             logger.error(traceback.format_exc())
-            # Si falla la generación del QR, no fallar toda la reserva
+            # Si falla la generacion del QR, no fallar toda la reserva
             codigo_qr = None
             qr_base64 = None
         
@@ -249,10 +250,10 @@ def obtener_mis_reservas(user_id, user_rol):
         for reserva in reservas:
             mesas_nombres = [rm.mesa.nombre for rm in reserva.reservas_mesa if rm.mesa]
             
-            # Obtener código QR activo
+            # Obtener codigo QR activo
             qr_codigo = None
             if reserva.qr_dinamicos:
-                # Buscar el QR más reciente o activo
+                # Buscar el QR mas reciente o activo
                 qr = next((q for q in reserva.qr_dinamicos if q.activo), None)
                 if qr:
                     qr_codigo = qr.codigo
@@ -267,13 +268,13 @@ def obtener_mis_reservas(user_id, user_rol):
                 else:
                     local_imagen = reserva.local.fotos[0].ruta
             
-            # Obtener dirección
+            # Obtener direccion
             direccion_str = ""
             if reserva.local and reserva.local.direccion:
                 d = reserva.local.direccion
                 direccion_str = f"{d.calle} {d.numero}"
                 
-            # Generar imagen QR si hay código
+            # Generar imagen QR si hay codigo
             qr_base64 = None
             if qr_codigo:
                 try:

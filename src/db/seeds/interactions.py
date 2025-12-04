@@ -18,7 +18,7 @@ def create_interactions(db):
         db.commit()
         logger.info("    ✓ Opiniones insertadas")
     else:
-        logger.info("    ⚠ Opiniones ya existen")
+        logger.info("    Opiniones ya existen")
 
     # ============ Favoritos ============
     logger.info("  → Insertando Favoritos de ejemplo...")
@@ -32,4 +32,4 @@ def create_interactions(db):
         db.commit()
         logger.info("    ✓ Favoritos insertados")
     else:
-        logger.info("    ⚠ Favoritos ya existen")
+        logger.info("    Favoritos ya existen")
