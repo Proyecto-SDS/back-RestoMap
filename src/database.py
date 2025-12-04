@@ -30,7 +30,6 @@ if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
         "Faltan variables de entorno criticas (DB_USER, DB_PASSWORD, DB_HOST o DB_NAME)."
     )
 
-# --- LoGICA DE CONEXIoN HiBRIDA (CLOUD RUN vs LOCAL) ---
 # pyrefly: ignore [missing-attribute]
 if DB_HOST.startswith("/cloudsql"):
     # Conexion via Unix Socket (Para Cloud Run)
