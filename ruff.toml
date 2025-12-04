@@ -78,6 +78,7 @@ ignore = [
     "PLR0912", # Too many branches (aceptable en validaciones complejas)
     "PLR0915", # Too many statements (aceptable en endpoints complejos)
     "C901",    # Complex function (para refactorizar gradualmente)
+    "PLC0415", # Import outside top-level (necesario para evitar imports circulares en Flask)
 ]
 
 # Permitir auto-fix para todas las reglas
