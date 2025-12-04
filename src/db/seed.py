@@ -5,19 +5,20 @@ Version optimizada para Cloud Run y Docker
 """
 
 import logging
-import os
 import sys
+import traceback
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-# --- 1. CONFIGURACIoN DE RUTAS (CRUCIAL PARA CLOUD RUN) ---
+# --- 1. CONFIGURACION DE RUTAS (CRUCIAL PARA CLOUD RUN Y DOCKER) ---
 # Obtenemos la ruta absoluta de este archivo (src/db/seed.py)
-current_dir = os.path.dirname(os.path.abspath(__file__))
+current_dir = Path(__file__).resolve().parent
 # Obtenemos la ruta 'src' (padre de db)
-src_dir = os.path.dirname(current_dir)
+src_dir = current_dir.parent
 # Agregamos 'src' al path de Python si no esta
-if src_dir not in sys.path:
-    sys.path.append(src_dir)
+if str(src_dir) not in sys.path:
+    sys.path.append(str(src_dir))
 
 # Configuracion de Logging (para que se vea bien en Google Cloud)
 logging.basicConfig(
@@ -98,8 +99,6 @@ def seed_database():
 
     except Exception as e:
         logger.error(f"Error fatal al poblar la base de datos: {e}")
-        import traceback
-
         logger.error(traceback.format_exc())
         db.rollback()
         sys.exit(1)

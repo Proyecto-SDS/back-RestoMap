@@ -1,6 +1,6 @@
 import logging
-import os
 import sys
+from pathlib import Path
 
 # Configurar logging
 logging.basicConfig(
@@ -8,17 +8,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- CORRECCIoN DE RUTAS ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
-sys.path.append(os.path.dirname(current_dir))
-# ---------------------------
+current_dir = Path(__file__).resolve().parent
+sys.path.append(str(current_dir))
+sys.path.append(str(current_dir.parent))
 
 try:
     from database import Base, engine
 
     # Importamos los modelos
-    from models import *  # --- AQUi ESTABA EL ERROR (Debe haber un salto de linea) ---
+    from models import *  # noqa: F403 - Necesario para que SQLAlchemy detecte todos los modelos
 
     def init_db():
         logger.info(f"Iniciando creacion de tablas en: {engine.url}")
