@@ -832,7 +832,15 @@ class QRDinamico(Base):
         Integer, ForeignKey("mesa.id", ondelete="CASCADE"), nullable=False, index=True
     )
     id_pedido = Column(
-        Integer, ForeignKey("pedido.id", ondelete="CASCADE"), nullable=True, index=True
+        Integer,
+        ForeignKey(
+            "pedido.id",
+            ondelete="CASCADE",
+            use_alter=True,
+            name="fk_qr_dinamico_pedido",
+        ),
+        nullable=True,
+        index=True,
     )
     id_reserva = Column(
         Integer, ForeignKey("reserva.id", ondelete="CASCADE"), nullable=True, index=True
@@ -881,7 +889,12 @@ class Pedido(Base):
     )
     id_qr = Column(
         Integer,
-        ForeignKey("qr_dinamico.id", ondelete="CASCADE"),
+        ForeignKey(
+            "qr_dinamico.id",
+            ondelete="CASCADE",
+            use_alter=True,
+            name="fk_pedido_qr_dinamico",
+        ),
         nullable=False,
         index=True,
     )

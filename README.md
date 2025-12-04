@@ -81,9 +81,6 @@ poetry config virtualenvs.in-project true
 
 # Instalar todas las dependencias
 poetry install
-
-# Activar el entorno virtual
-poetry shell
 ```
 
 ### Ejecutar la aplicación localmente

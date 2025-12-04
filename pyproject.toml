@@ -64,7 +64,7 @@ prepend_sys_path = [
 
 # Plantilla para nombres de archivos de migración
 # Formato: AAAA_MM_DD_HHMM-{rev}_{slug}
-file_template = "%%%(year)d_%%%(month).2d_%%%(day).2d_%%%(hour).2d%%%(minute).2d-%%%(rev)s_%%%(slug)s"
+file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
 
 # Zona horaria para timestamps (requiere python>=3.9)
 timezone = "America/Santiago"
@@ -85,11 +85,13 @@ recursive_version_locations = false
 output_encoding = "utf-8"
 
 # Post-write hooks para formatear código generado
-[[tool.alembic.post_write_hooks]]
-name = "ruff"
-type = "console_scripts"
-entrypoint = "ruff"
-options = "format REVISION_SCRIPT_FILENAME"
+# DESHABILITADO: ruff no está disponible en el contenedor de producción
+# Para formatear migraciones localmente, ejecuta: ruff format alembic/versions/
+# [[tool.alembic.post_write_hooks]]
+# name = "ruff"
+# type = "console_scripts"
+# entrypoint = "ruff"
+# options = "format REVISION_SCRIPT_FILENAME"
 
 [tool.poetry.urls]
 repository = "https://github.com/Proyecto-SDS/back-RestoMap"

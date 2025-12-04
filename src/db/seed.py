@@ -73,13 +73,27 @@ def seed_database():
     # --- LIMPIEZA DE BASE DE DATOS ---
     logger.info("♻Limpiando base de datos completa...")
     try:
-        # Eliminar todas las tablas y volver a crearlas
-        Base.metadata.drop_all(bind=engine)
+        # Para PostgreSQL, usar DROP SCHEMA CASCADE es más confiable
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+            conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+            conn.commit()
+
+        # Ahora crear todas las tablas desde cero
         Base.metadata.create_all(bind=engine)
         logger.info("   ✓ Base de datos limpiada y recreada.")
     except Exception as e:
         logger.error(f"   Error al limpiar base de datos: {e}")
-        # Intentamos continuar
+        # Si falla, intentar con el método tradicional
+        try:
+            Base.metadata.drop_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
+            logger.info("   ✓ Base de datos limpiada (método alternativo).")
+        except Exception as e2:
+            logger.error(f"   Error en limpieza alternativa: {e2}")
 
     db = SessionLocal()
     logger.info("Iniciando proceso de Seed en la base de datos...")
@@ -87,8 +101,8 @@ def seed_database():
     try:
         create_roles(db)
         create_catalogs(db)
-        create_users(db)
-        create_locals(db)
+        create_locals(db)  # Locales primero
+        create_users(db)  # Usuarios después (algunos tienen id_local)
         create_products(db)
         create_interactions(db)
         create_reservations(db)

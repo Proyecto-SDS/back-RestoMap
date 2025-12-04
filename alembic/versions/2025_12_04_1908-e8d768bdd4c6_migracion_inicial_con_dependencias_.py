@@ -1,8 +1,8 @@
-"""Migracion inicial completa
+"""Migracion inicial con dependencias corregidas
 
-Revision ID: f7e8fcdc9a00
+Revision ID: e8d768bdd4c6
 Revises: 
-Create Date: 2025-11-25 22:08:36.912596
+Create Date: 2025-12-04 19:08:01.555326-03:00
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f7e8fcdc9a00'
+revision: str = 'e8d768bdd4c6'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -72,21 +72,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_direccion_id'), 'direccion', ['id'], unique=False)
     op.create_index(op.f('ix_direccion_id_comuna'), 'direccion', ['id_comuna'], unique=False)
-    op.create_table('usuario',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('id_rol', sa.Integer(), nullable=True),
-    sa.Column('nombre', sa.String(length=100), nullable=False),
-    sa.Column('correo', sa.String(length=100), nullable=False),
-    sa.Column('contrasena', sa.String(length=200), nullable=False),
-    sa.Column('telefono', sa.String(length=32), nullable=False),
-    sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['id_rol'], ['rol.id'], ondelete='SET NULL'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_usuario_correo'), 'usuario', ['correo'], unique=True)
-    op.create_index(op.f('ix_usuario_creado_el'), 'usuario', ['creado_el'], unique=False)
-    op.create_index(op.f('ix_usuario_id'), 'usuario', ['id'], unique=False)
-    op.create_index(op.f('ix_usuario_id_rol'), 'usuario', ['id_rol'], unique=False)
     op.create_table('local',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_direccion', sa.Integer(), nullable=False),
@@ -103,20 +88,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_local_id'), 'local', ['id'], unique=False)
     op.create_index(op.f('ix_local_id_direccion'), 'local', ['id_direccion'], unique=False)
     op.create_index(op.f('ix_local_id_tipo_local'), 'local', ['id_tipo_local'], unique=False)
-    op.create_table('favorito',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('id_usuario', sa.Integer(), nullable=False),
-    sa.Column('id_local', sa.Integer(), nullable=False),
-    sa.Column('agregado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('id_usuario', 'id_local', name='uq_usuario_local_favorito')
-    )
-    op.create_index(op.f('ix_favorito_agregado_el'), 'favorito', ['agregado_el'], unique=False)
-    op.create_index(op.f('ix_favorito_id'), 'favorito', ['id'], unique=False)
-    op.create_index(op.f('ix_favorito_id_local'), 'favorito', ['id_local'], unique=False)
-    op.create_index(op.f('ix_favorito_id_usuario'), 'favorito', ['id_usuario'], unique=False)
     op.create_table('horario',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_local', sa.Integer(), nullable=False),
@@ -145,22 +116,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_mesa_id'), 'mesa', ['id'], unique=False)
     op.create_index(op.f('ix_mesa_id_local'), 'mesa', ['id_local'], unique=False)
-    op.create_table('opinion',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('id_usuario', sa.Integer(), nullable=False),
-    sa.Column('id_local', sa.Integer(), nullable=False),
-    sa.Column('puntuacion', sa.Numeric(precision=2, scale=1), nullable=False),
-    sa.Column('comentario', sa.String(length=500), nullable=False),
-    sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('eliminado_el', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_opinion_creado_el'), 'opinion', ['creado_el'], unique=False)
-    op.create_index(op.f('ix_opinion_id'), 'opinion', ['id'], unique=False)
-    op.create_index(op.f('ix_opinion_id_local'), 'opinion', ['id_local'], unique=False)
-    op.create_index(op.f('ix_opinion_id_usuario'), 'opinion', ['id_usuario'], unique=False)
     op.create_table('producto',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_local', sa.Integer(), nullable=False),
@@ -176,23 +131,38 @@ def upgrade() -> None:
     op.create_index(op.f('ix_producto_id'), 'producto', ['id'], unique=False)
     op.create_index(op.f('ix_producto_id_categoria'), 'producto', ['id_categoria'], unique=False)
     op.create_index(op.f('ix_producto_id_local'), 'producto', ['id_local'], unique=False)
-    op.create_table('reserva',
+    op.create_table('usuario',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('id_local', sa.Integer(), nullable=False),
-    sa.Column('id_usuario', sa.Integer(), nullable=False),
-    sa.Column('fecha_reserva', sa.Date(), nullable=False),
-    sa.Column('hora_reserva', sa.Time(), nullable=False),
-    sa.Column('estado', sa.Enum('PENDIENTE', 'CONFIRMADA', 'RECHAZADA', name='estado_reserva_enum'), nullable=False),
+    sa.Column('id_rol', sa.Integer(), nullable=True),
+    sa.Column('id_local', sa.Integer(), nullable=True),
+    sa.Column('nombre', sa.String(length=100), nullable=False),
+    sa.Column('correo', sa.String(length=100), nullable=False),
+    sa.Column('contrasena', sa.String(length=200), nullable=False),
+    sa.Column('telefono', sa.String(length=32), nullable=True),
     sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('expirado_el', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['id_rol'], ['rol.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_reserva_creado_el'), 'reserva', ['creado_el'], unique=False)
-    op.create_index(op.f('ix_reserva_id'), 'reserva', ['id'], unique=False)
-    op.create_index(op.f('ix_reserva_id_local'), 'reserva', ['id_local'], unique=False)
-    op.create_index(op.f('ix_reserva_id_usuario'), 'reserva', ['id_usuario'], unique=False)
+    op.create_index(op.f('ix_usuario_correo'), 'usuario', ['correo'], unique=True)
+    op.create_index(op.f('ix_usuario_creado_el'), 'usuario', ['creado_el'], unique=False)
+    op.create_index(op.f('ix_usuario_id'), 'usuario', ['id'], unique=False)
+    op.create_index(op.f('ix_usuario_id_local'), 'usuario', ['id_local'], unique=False)
+    op.create_index(op.f('ix_usuario_id_rol'), 'usuario', ['id_rol'], unique=False)
+    op.create_table('favorito',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id_usuario', sa.Integer(), nullable=False),
+    sa.Column('id_local', sa.Integer(), nullable=False),
+    sa.Column('agregado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('id_usuario', 'id_local', name='uq_usuario_local_favorito')
+    )
+    op.create_index(op.f('ix_favorito_agregado_el'), 'favorito', ['agregado_el'], unique=False)
+    op.create_index(op.f('ix_favorito_id'), 'favorito', ['id'], unique=False)
+    op.create_index(op.f('ix_favorito_id_local'), 'favorito', ['id_local'], unique=False)
+    op.create_index(op.f('ix_favorito_id_usuario'), 'favorito', ['id_usuario'], unique=False)
     op.create_table('foto',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_local', sa.Integer(), nullable=True),
@@ -211,47 +181,79 @@ def upgrade() -> None:
     op.create_index(op.f('ix_foto_id_local'), 'foto', ['id_local'], unique=False)
     op.create_index(op.f('ix_foto_id_producto'), 'foto', ['id_producto'], unique=False)
     op.create_index(op.f('ix_foto_id_tipo_foto'), 'foto', ['id_tipo_foto'], unique=False)
+    op.create_table('opinion',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id_usuario', sa.Integer(), nullable=False),
+    sa.Column('id_local', sa.Integer(), nullable=False),
+    sa.Column('puntuacion', sa.Numeric(precision=2, scale=1), nullable=False),
+    sa.Column('comentario', sa.String(length=500), nullable=False),
+    sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('eliminado_el', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_opinion_creado_el'), 'opinion', ['creado_el'], unique=False)
+    op.create_index(op.f('ix_opinion_id'), 'opinion', ['id'], unique=False)
+    op.create_index(op.f('ix_opinion_id_local'), 'opinion', ['id_local'], unique=False)
+    op.create_index(op.f('ix_opinion_id_usuario'), 'opinion', ['id_usuario'], unique=False)
     op.create_table('pedido',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('local_id', sa.Integer(), nullable=True),
-    sa.Column('mesa_id', sa.Integer(), nullable=True),
-    sa.Column('usuario_id', sa.Integer(), nullable=True),
-    sa.Column('estado', sa.Enum('ABIERTO', 'EN_PREPARACION', 'SERVIDO', 'CERRADO', 'CANCELADO', name='estado_pedido_enum'), nullable=False),
+    sa.Column('id_local', sa.Integer(), nullable=False),
+    sa.Column('id_mesa', sa.Integer(), nullable=False),
+    sa.Column('id_usuario', sa.Integer(), nullable=False),
+    sa.Column('id_qr', sa.Integer(), nullable=False),
+    sa.Column('creado_por', sa.Integer(), nullable=False),
+    sa.Column('estado', sa.Enum('INICIADO', 'RECEPCION', 'EN_PROCESO', 'TERMINADO', 'COMPLETADO', 'CANCELADO', name='estado_pedido_enum'), nullable=False),
     sa.Column('total', sa.Integer(), nullable=False),
     sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('actualizado_el', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['local_id'], ['local.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['mesa_id'], ['mesa.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['usuario_id'], ['usuario.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['creado_por'], ['usuario.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_mesa'], ['mesa.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_qr'], ['qr_dinamico.id'], name='fk_pedido_qr_dinamico', ondelete='CASCADE', use_alter=True),
+    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_pedido_creado_el'), 'pedido', ['creado_el'], unique=False)
+    op.create_index(op.f('ix_pedido_creado_por'), 'pedido', ['creado_por'], unique=False)
+    op.create_index(op.f('ix_pedido_estado'), 'pedido', ['estado'], unique=False)
     op.create_index(op.f('ix_pedido_id'), 'pedido', ['id'], unique=False)
-    op.create_index(op.f('ix_pedido_local_id'), 'pedido', ['local_id'], unique=False)
-    op.create_index(op.f('ix_pedido_mesa_id'), 'pedido', ['mesa_id'], unique=False)
-    op.create_index(op.f('ix_pedido_usuario_id'), 'pedido', ['usuario_id'], unique=False)
-    op.create_table('reserva_mesa',
+    op.create_index(op.f('ix_pedido_id_local'), 'pedido', ['id_local'], unique=False)
+    op.create_index(op.f('ix_pedido_id_mesa'), 'pedido', ['id_mesa'], unique=False)
+    op.create_index(op.f('ix_pedido_id_qr'), 'pedido', ['id_qr'], unique=False)
+    op.create_index(op.f('ix_pedido_id_usuario'), 'pedido', ['id_usuario'], unique=False)
+    op.create_table('reserva',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('id_reserva', sa.Integer(), nullable=False),
-    sa.Column('id_mesa', sa.Integer(), nullable=False),
-    sa.Column('prioridad', sa.Enum('ALTA', 'MEDIA', 'BAJA', name='estado_reserva_mesa_enum'), nullable=False),
-    sa.ForeignKeyConstraint(['id_mesa'], ['mesa.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['id_reserva'], ['reserva.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('id_reserva', 'id_mesa', name='uq_reserva_mesa')
+    sa.Column('id_local', sa.Integer(), nullable=False),
+    sa.Column('id_usuario', sa.Integer(), nullable=False),
+    sa.Column('fecha_reserva', sa.Date(), nullable=False),
+    sa.Column('hora_reserva', sa.Time(), nullable=False),
+    sa.Column('estado', sa.Enum('PENDIENTE', 'CONFIRMADA', 'RECHAZADA', 'EXPIRADA', name='estado_reserva_enum'), nullable=False),
+    sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('expirado_el', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['id_local'], ['local.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_reserva_mesa_id_mesa'), 'reserva_mesa', ['id_mesa'], unique=False)
-    op.create_index(op.f('ix_reserva_mesa_id_reserva'), 'reserva_mesa', ['id_reserva'], unique=False)
+    op.create_index(op.f('ix_reserva_creado_el'), 'reserva', ['creado_el'], unique=False)
+    op.create_index(op.f('ix_reserva_id'), 'reserva', ['id'], unique=False)
+    op.create_index(op.f('ix_reserva_id_local'), 'reserva', ['id_local'], unique=False)
+    op.create_index(op.f('ix_reserva_id_usuario'), 'reserva', ['id_usuario'], unique=False)
     op.create_table('cuenta',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_pedido', sa.Integer(), nullable=False),
     sa.Column('id_producto', sa.Integer(), nullable=False),
+    sa.Column('creado_por', sa.Integer(), nullable=False),
     sa.Column('cantidad', sa.Integer(), nullable=False),
-    sa.Column('observaciones', sa.String(length=500), nullable=False),
+    sa.Column('observaciones', sa.String(length=500), nullable=True),
+    sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['creado_por'], ['usuario.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['id_pedido'], ['pedido.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['id_producto'], ['producto.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_cuenta_creado_por'), 'cuenta', ['creado_por'], unique=False)
     op.create_index(op.f('ix_cuenta_id'), 'cuenta', ['id'], unique=False)
     op.create_index(op.f('ix_cuenta_id_pedido'), 'cuenta', ['id_pedido'], unique=False)
     op.create_index(op.f('ix_cuenta_id_producto'), 'cuenta', ['id_producto'], unique=False)
@@ -268,48 +270,61 @@ def upgrade() -> None:
     op.create_index(op.f('ix_encomienda_id_pedido'), 'encomienda', ['id_pedido'], unique=False)
     op.create_table('estado_pedido',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('pedido_id', sa.Integer(), nullable=False),
-    sa.Column('estado', sa.Enum('ABIERTO', 'EN_PREPARACION', 'SERVIDO', 'CERRADO', 'CANCELADO', name='estado_pedido_enum'), nullable=False),
+    sa.Column('id_pedido', sa.Integer(), nullable=False),
+    sa.Column('estado', sa.Enum('INICIADO', 'RECEPCION', 'EN_PROCESO', 'TERMINADO', 'COMPLETADO', 'CANCELADO', name='estado_pedido_enum'), nullable=False),
     sa.Column('creado_por', sa.Integer(), nullable=False),
     sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['creado_por'], ['usuario.id'], ),
-    sa.ForeignKeyConstraint(['pedido_id'], ['pedido.id'], ondelete='CASCADE'),
+    sa.Column('nota', sa.String(length=200), nullable=True),
+    sa.ForeignKeyConstraint(['creado_por'], ['usuario.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_pedido'], ['pedido.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_estado_pedido_creado_el'), 'estado_pedido', ['creado_el'], unique=False)
     op.create_index(op.f('ix_estado_pedido_creado_por'), 'estado_pedido', ['creado_por'], unique=False)
+    op.create_index(op.f('ix_estado_pedido_estado'), 'estado_pedido', ['estado'], unique=False)
     op.create_index(op.f('ix_estado_pedido_id'), 'estado_pedido', ['id'], unique=False)
-    op.create_index(op.f('ix_estado_pedido_pedido_id'), 'estado_pedido', ['pedido_id'], unique=False)
+    op.create_index(op.f('ix_estado_pedido_id_pedido'), 'estado_pedido', ['id_pedido'], unique=False)
     op.create_table('pago',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('pedido_id', sa.Integer(), nullable=True),
+    sa.Column('id_pedido', sa.Integer(), nullable=False),
+    sa.Column('creado_por', sa.Integer(), nullable=False),
     sa.Column('metodo', sa.Enum('EFECTIVO', 'TRANSFERENCIA', 'DEBITO', 'CREDITO', 'APP_DE_PAGO', 'OTRO', name='metodo_pago_enum'), nullable=False),
     sa.Column('estado', sa.Enum('PENDIENTE', 'COBRADO', 'CANCELADO', name='estado_pago_enum'), nullable=False),
     sa.Column('monto', sa.Integer(), nullable=False),
     sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('actualizado_el', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['pedido_id'], ['pedido.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['creado_por'], ['usuario.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_pedido'], ['pedido.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_pago_creado_el'), 'pago', ['creado_el'], unique=False)
+    op.create_index(op.f('ix_pago_creado_por'), 'pago', ['creado_por'], unique=False)
+    op.create_index(op.f('ix_pago_estado'), 'pago', ['estado'], unique=False)
     op.create_index(op.f('ix_pago_id'), 'pago', ['id'], unique=False)
-    op.create_index(op.f('ix_pago_pedido_id'), 'pago', ['pedido_id'], unique=False)
+    op.create_index(op.f('ix_pago_id_pedido'), 'pago', ['id_pedido'], unique=False)
     op.create_table('qr_dinamico',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_mesa', sa.Integer(), nullable=False),
     sa.Column('id_pedido', sa.Integer(), nullable=True),
     sa.Column('id_reserva', sa.Integer(), nullable=True),
+    sa.Column('id_usuario', sa.Integer(), nullable=False),
     sa.Column('codigo', sa.String(length=255), nullable=False),
-    sa.Column('expiracion', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('expiracion', sa.DateTime(timezone=True), nullable=False),
     sa.Column('activo', sa.Boolean(), nullable=False),
+    sa.Column('creado_el', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['id_mesa'], ['mesa.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['id_pedido'], ['pedido.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_pedido'], ['pedido.id'], name='fk_qr_dinamico_pedido', ondelete='CASCADE', use_alter=True),
     sa.ForeignKeyConstraint(['id_reserva'], ['reserva.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('codigo')
+    sa.ForeignKeyConstraint(['id_usuario'], ['usuario.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_qr_dinamico_activo'), 'qr_dinamico', ['activo'], unique=False)
+    op.create_index(op.f('ix_qr_dinamico_codigo'), 'qr_dinamico', ['codigo'], unique=True)
+    op.create_index(op.f('ix_qr_dinamico_id'), 'qr_dinamico', ['id'], unique=False)
     op.create_index(op.f('ix_qr_dinamico_id_mesa'), 'qr_dinamico', ['id_mesa'], unique=False)
     op.create_index(op.f('ix_qr_dinamico_id_pedido'), 'qr_dinamico', ['id_pedido'], unique=False)
     op.create_index(op.f('ix_qr_dinamico_id_reserva'), 'qr_dinamico', ['id_reserva'], unique=False)
+    op.create_index(op.f('ix_qr_dinamico_id_usuario'), 'qr_dinamico', ['id_usuario'], unique=False)
     op.create_table('redes',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_local', sa.Integer(), nullable=False),
@@ -326,6 +341,17 @@ def upgrade() -> None:
     op.create_index(op.f('ix_redes_id_foto'), 'redes', ['id_foto'], unique=False)
     op.create_index(op.f('ix_redes_id_local'), 'redes', ['id_local'], unique=False)
     op.create_index(op.f('ix_redes_id_tipo_red'), 'redes', ['id_tipo_red'], unique=False)
+    op.create_table('reserva_mesa',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id_reserva', sa.Integer(), nullable=False),
+    sa.Column('id_mesa', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['id_mesa'], ['mesa.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['id_reserva'], ['reserva.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('id_reserva', 'id_mesa', name='uq_reserva_mesa')
+    )
+    op.create_index(op.f('ix_reserva_mesa_id_mesa'), 'reserva_mesa', ['id_mesa'], unique=False)
+    op.create_index(op.f('ix_reserva_mesa_id_reserva'), 'reserva_mesa', ['id_reserva'], unique=False)
     op.create_table('encomienda_cuenta',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('id_cuenta', sa.Integer(), nullable=False),
@@ -347,22 +373,33 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_encomienda_cuenta_id_cuenta'), table_name='encomienda_cuenta')
     op.drop_index(op.f('ix_encomienda_cuenta_id'), table_name='encomienda_cuenta')
     op.drop_table('encomienda_cuenta')
+    op.drop_index(op.f('ix_reserva_mesa_id_reserva'), table_name='reserva_mesa')
+    op.drop_index(op.f('ix_reserva_mesa_id_mesa'), table_name='reserva_mesa')
+    op.drop_table('reserva_mesa')
     op.drop_index(op.f('ix_redes_id_tipo_red'), table_name='redes')
     op.drop_index(op.f('ix_redes_id_local'), table_name='redes')
     op.drop_index(op.f('ix_redes_id_foto'), table_name='redes')
     op.drop_index(op.f('ix_redes_id'), table_name='redes')
     op.drop_table('redes')
+    op.drop_index(op.f('ix_qr_dinamico_id_usuario'), table_name='qr_dinamico')
     op.drop_index(op.f('ix_qr_dinamico_id_reserva'), table_name='qr_dinamico')
     op.drop_index(op.f('ix_qr_dinamico_id_pedido'), table_name='qr_dinamico')
     op.drop_index(op.f('ix_qr_dinamico_id_mesa'), table_name='qr_dinamico')
+    op.drop_index(op.f('ix_qr_dinamico_id'), table_name='qr_dinamico')
+    op.drop_index(op.f('ix_qr_dinamico_codigo'), table_name='qr_dinamico')
+    op.drop_index(op.f('ix_qr_dinamico_activo'), table_name='qr_dinamico')
     op.drop_table('qr_dinamico')
-    op.drop_index(op.f('ix_pago_pedido_id'), table_name='pago')
+    op.drop_index(op.f('ix_pago_id_pedido'), table_name='pago')
     op.drop_index(op.f('ix_pago_id'), table_name='pago')
+    op.drop_index(op.f('ix_pago_estado'), table_name='pago')
+    op.drop_index(op.f('ix_pago_creado_por'), table_name='pago')
     op.drop_index(op.f('ix_pago_creado_el'), table_name='pago')
     op.drop_table('pago')
-    op.drop_index(op.f('ix_estado_pedido_pedido_id'), table_name='estado_pedido')
+    op.drop_index(op.f('ix_estado_pedido_id_pedido'), table_name='estado_pedido')
     op.drop_index(op.f('ix_estado_pedido_id'), table_name='estado_pedido')
+    op.drop_index(op.f('ix_estado_pedido_estado'), table_name='estado_pedido')
     op.drop_index(op.f('ix_estado_pedido_creado_por'), table_name='estado_pedido')
+    op.drop_index(op.f('ix_estado_pedido_creado_el'), table_name='estado_pedido')
     op.drop_table('estado_pedido')
     op.drop_index(op.f('ix_encomienda_id_pedido'), table_name='encomienda')
     op.drop_index(op.f('ix_encomienda_id'), table_name='encomienda')
@@ -371,57 +408,59 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_cuenta_id_producto'), table_name='cuenta')
     op.drop_index(op.f('ix_cuenta_id_pedido'), table_name='cuenta')
     op.drop_index(op.f('ix_cuenta_id'), table_name='cuenta')
+    op.drop_index(op.f('ix_cuenta_creado_por'), table_name='cuenta')
     op.drop_table('cuenta')
-    op.drop_index(op.f('ix_reserva_mesa_id_reserva'), table_name='reserva_mesa')
-    op.drop_index(op.f('ix_reserva_mesa_id_mesa'), table_name='reserva_mesa')
-    op.drop_table('reserva_mesa')
-    op.drop_index(op.f('ix_pedido_usuario_id'), table_name='pedido')
-    op.drop_index(op.f('ix_pedido_mesa_id'), table_name='pedido')
-    op.drop_index(op.f('ix_pedido_local_id'), table_name='pedido')
+    op.drop_index(op.f('ix_reserva_id_usuario'), table_name='reserva')
+    op.drop_index(op.f('ix_reserva_id_local'), table_name='reserva')
+    op.drop_index(op.f('ix_reserva_id'), table_name='reserva')
+    op.drop_index(op.f('ix_reserva_creado_el'), table_name='reserva')
+    op.drop_table('reserva')
+    op.drop_index(op.f('ix_pedido_id_usuario'), table_name='pedido')
+    op.drop_index(op.f('ix_pedido_id_qr'), table_name='pedido')
+    op.drop_index(op.f('ix_pedido_id_mesa'), table_name='pedido')
+    op.drop_index(op.f('ix_pedido_id_local'), table_name='pedido')
     op.drop_index(op.f('ix_pedido_id'), table_name='pedido')
+    op.drop_index(op.f('ix_pedido_estado'), table_name='pedido')
+    op.drop_index(op.f('ix_pedido_creado_por'), table_name='pedido')
     op.drop_index(op.f('ix_pedido_creado_el'), table_name='pedido')
     op.drop_table('pedido')
+    op.drop_index(op.f('ix_opinion_id_usuario'), table_name='opinion')
+    op.drop_index(op.f('ix_opinion_id_local'), table_name='opinion')
+    op.drop_index(op.f('ix_opinion_id'), table_name='opinion')
+    op.drop_index(op.f('ix_opinion_creado_el'), table_name='opinion')
+    op.drop_table('opinion')
     op.drop_index(op.f('ix_foto_id_tipo_foto'), table_name='foto')
     op.drop_index(op.f('ix_foto_id_producto'), table_name='foto')
     op.drop_index(op.f('ix_foto_id_local'), table_name='foto')
     op.drop_index(op.f('ix_foto_id_categoria'), table_name='foto')
     op.drop_index(op.f('ix_foto_id'), table_name='foto')
     op.drop_table('foto')
-    op.drop_index(op.f('ix_reserva_id_usuario'), table_name='reserva')
-    op.drop_index(op.f('ix_reserva_id_local'), table_name='reserva')
-    op.drop_index(op.f('ix_reserva_id'), table_name='reserva')
-    op.drop_index(op.f('ix_reserva_creado_el'), table_name='reserva')
-    op.drop_table('reserva')
+    op.drop_index(op.f('ix_favorito_id_usuario'), table_name='favorito')
+    op.drop_index(op.f('ix_favorito_id_local'), table_name='favorito')
+    op.drop_index(op.f('ix_favorito_id'), table_name='favorito')
+    op.drop_index(op.f('ix_favorito_agregado_el'), table_name='favorito')
+    op.drop_table('favorito')
+    op.drop_index(op.f('ix_usuario_id_rol'), table_name='usuario')
+    op.drop_index(op.f('ix_usuario_id_local'), table_name='usuario')
+    op.drop_index(op.f('ix_usuario_id'), table_name='usuario')
+    op.drop_index(op.f('ix_usuario_creado_el'), table_name='usuario')
+    op.drop_index(op.f('ix_usuario_correo'), table_name='usuario')
+    op.drop_table('usuario')
     op.drop_index(op.f('ix_producto_id_local'), table_name='producto')
     op.drop_index(op.f('ix_producto_id_categoria'), table_name='producto')
     op.drop_index(op.f('ix_producto_id'), table_name='producto')
     op.drop_table('producto')
-    op.drop_index(op.f('ix_opinion_id_usuario'), table_name='opinion')
-    op.drop_index(op.f('ix_opinion_id_local'), table_name='opinion')
-    op.drop_index(op.f('ix_opinion_id'), table_name='opinion')
-    op.drop_index(op.f('ix_opinion_creado_el'), table_name='opinion')
-    op.drop_table('opinion')
     op.drop_index(op.f('ix_mesa_id_local'), table_name='mesa')
     op.drop_index(op.f('ix_mesa_id'), table_name='mesa')
     op.drop_table('mesa')
     op.drop_index(op.f('ix_horario_id_local'), table_name='horario')
     op.drop_index(op.f('ix_horario_id'), table_name='horario')
     op.drop_table('horario')
-    op.drop_index(op.f('ix_favorito_id_usuario'), table_name='favorito')
-    op.drop_index(op.f('ix_favorito_id_local'), table_name='favorito')
-    op.drop_index(op.f('ix_favorito_id'), table_name='favorito')
-    op.drop_index(op.f('ix_favorito_agregado_el'), table_name='favorito')
-    op.drop_table('favorito')
     op.drop_index(op.f('ix_local_id_tipo_local'), table_name='local')
     op.drop_index(op.f('ix_local_id_direccion'), table_name='local')
     op.drop_index(op.f('ix_local_id'), table_name='local')
     op.drop_index(op.f('ix_local_correo'), table_name='local')
     op.drop_table('local')
-    op.drop_index(op.f('ix_usuario_id_rol'), table_name='usuario')
-    op.drop_index(op.f('ix_usuario_id'), table_name='usuario')
-    op.drop_index(op.f('ix_usuario_creado_el'), table_name='usuario')
-    op.drop_index(op.f('ix_usuario_correo'), table_name='usuario')
-    op.drop_table('usuario')
     op.drop_index(op.f('ix_direccion_id_comuna'), table_name='direccion')
     op.drop_index(op.f('ix_direccion_id'), table_name='direccion')
     op.drop_table('direccion')

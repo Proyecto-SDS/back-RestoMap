@@ -21,8 +21,10 @@ from .models import (
     EstadoPagoEnum,
     EstadoPedido,
     EstadoPedidoEnum,
+    EstadoPedidoSchema,
     EstadoProductoEnum,
     EstadoReservaEnum,
+    # ============ Modelos - Favoritos ============
     Favorito,
     # ============ Modelos - Multimedia ============
     Foto,
@@ -54,7 +56,7 @@ from .models import (
     Reserva,
     ReservaMesa,
     ReservaSchema,
-    # ============ Modelos - Tablas de Referencia ============
+    # ============ Tablas de Referencia ============
     Rol,
     RolEnum,
     # ============ Schemas Pydantic ============
@@ -68,73 +70,77 @@ from .models import (
     UsuarioSchema,
     # ============ Funciones Auxiliares ============
     obtener_etiqueta,
+    obtener_prioridad_reserva,
     validar_transicion_estado,
 )
 
-__all__ = [
+__all__ = [  # noqa: RUF022
     # Base
     "Base",
-    "Categoria",
+    # Tablas de Referencia
+    "Rol",
     "Comuna",
-    "Cuenta",
-    "CuentaSchema",
+    "TipoLocal",
+    "TipoRed",
+    "TipoFoto",
+    "Categoria",
     # Modelos - Ubicacion
     "Direccion",
-    # Modelos - Encomiendas
-    "Encomienda",
-    "EncomiendaCuenta",
-    "EncomiendaSchema",
-    "EstadoEncomiendaEnum",
-    "EstadoMesaEnum",
-    "EstadoPagoEnum",
-    "EstadoPedido",
-    "EstadoPedidoEnum",
-    "EstadoProductoEnum",
-    "EstadoReservaEnum",
-    "Favorito",
-    # Modelos - Multimedia
-    "Foto",
-    "Horario",
     # Modelos - Locales
     "Local",
-    "LocalSchema",
+    "Horario",
     "Mesa",
-    "MesaSchema",
-    # Enums
-    "MetodoPagoEnum",
-    # Modelos - Opiniones
-    "Opinion",
-    "OpinionSchema",
-    # Modelos - Pagos
-    "Pago",
-    "PagoSchema",
-    # Modelos - Pedidos
-    "Pedido",
-    "PedidoSchema",
+    # Modelos - Usuarios
+    "Usuario",
+    # Modelos - Multimedia
+    "Foto",
+    "Redes",
     # Modelos - Productos
     "Producto",
-    "ProductoSchema",
-    # Modelos - QR
-    "QRDinamico",
-    "QRDinamicoSchema",
-    "Redes",
+    # Modelos - Opiniones
+    "Opinion",
+    # Modelos - Favoritos
+    "Favorito",
     # Modelos - Reservas
     "Reserva",
     "ReservaMesa",
-    "ReservaSchema",
-    # Modelos - Referencia
-    "Rol",
+    # Modelos - QR
+    "QRDinamico",
+    # Modelos - Pedidos
+    "Pedido",
+    "Cuenta",
+    "EstadoPedido",
+    # Modelos - Encomiendas
+    "Encomienda",
+    "EncomiendaCuenta",
+    # Modelos - Pagos
+    "Pago",
+    # Enums
+    "MetodoPagoEnum",
+    "EstadoPagoEnum",
+    "EstadoPedidoEnum",
+    "EstadoMesaEnum",
+    "EstadoReservaEnum",
+    "EstadoProductoEnum",
+    "EstadoEncomiendaEnum",
     "RolEnum",
+    "TipoHorarioEnum",
     # Schemas Pydantic
     "RolSchema",
-    "TipoFoto",
-    "TipoHorarioEnum",
-    "TipoLocal",
-    "TipoRed",
-    # Modelos - Usuarios
-    "Usuario",
     "UsuarioSchema",
+    "LocalSchema",
+    "ProductoSchema",
+    "PedidoSchema",
+    "PagoSchema",
+    "MesaSchema",
+    "QRDinamicoSchema",
+    "ReservaSchema",
+    "OpinionSchema",
+    "CuentaSchema",
+    "EncomiendaSchema",
+    "EstadoPedidoSchema",
     # Funciones Auxiliares
     "obtener_etiqueta",
+    "obtener_prioridad_reserva",
     "validar_transicion_estado",
 ]
