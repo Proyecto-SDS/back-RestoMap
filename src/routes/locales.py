@@ -666,9 +666,9 @@ def obtener_mesas_disponibles(id):
         )
 
         # Verificar disponibilidad de cada mesa
-        # Considerar un rango de ±2 horas
-        hora_inicio = (datetime.combine(fecha, hora) - timedelta(hours=2)).time()
-        hora_fin = (datetime.combine(fecha, hora) + timedelta(hours=2)).time()
+        # Considerar un rango de ±75 minutos (1 hora y 15 minutos)
+        hora_inicio = (datetime.combine(fecha, hora) - timedelta(minutes=75)).time()
+        hora_fin = (datetime.combine(fecha, hora) + timedelta(minutes=75)).time()
 
         # Obtener IDs de mesas ocupadas en ese rango
         mesas_ocupadas = (

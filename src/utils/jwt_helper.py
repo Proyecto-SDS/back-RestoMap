@@ -64,7 +64,7 @@ def requerir_auth(f):
     Usage:
         @app.route('/api/protected')
         @requerir_auth
-        def protected_route(user_id, user_rol):
+        def protected_route(user_id, _user_rol):
             return {'message': f'Hola usuario {user_id}'}
     """
 
@@ -90,9 +90,9 @@ def requerir_auth(f):
         if not payload:
             return jsonify({"error": "Token invalido o expirado"}), 401
 
-        # Agregar user_id y user_rol al contexto de la funcion
-        kwargs["user_id"] = payload["user_id"]
-        kwargs["user_rol"] = payload["rol"]
+        # Agregar user_id y _user_rol al contexto de la funcion
+        kwargs["_user_id"] = payload["_user_id"]
+        kwargs["_user_rol"] = payload["_rol"]
 
         return f(*args, **kwargs)
 

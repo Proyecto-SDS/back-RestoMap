@@ -132,12 +132,12 @@ def crear_reserva(user_id, _user_rol):
             ), 400
 
         # Verificar disponibilidad de la mesa para esa fecha y hora
-        # Considerar un rango de ±2 horas
+        # Considerar un rango de ±75 minutos (1 hora y 15 minutos)
         hora_inicio = (
-            datetime.combine(date.today(), hora_reserva) - timedelta(hours=2)
+            datetime.combine(date.today(), hora_reserva) - timedelta(minutes=75)
         ).time()
         hora_fin = (
-            datetime.combine(date.today(), hora_reserva) + timedelta(hours=2)
+            datetime.combine(date.today(), hora_reserva) + timedelta(minutes=75)
         ).time()
 
         reservas_existentes = (
