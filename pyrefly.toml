@@ -15,11 +15,11 @@ project-excludes = [
     "__pycache__",
     ".git",
     ".github",
-    "*.egg-info"
+    "*.egg-info",
 ]
 
 # Version de Python objetivo
-python-version = "3.11"
+python-version = "3.12.10"
 
 # Ruta al intérprete de Python
 python-interpreter-path = ".venv/Scripts/python.exe"

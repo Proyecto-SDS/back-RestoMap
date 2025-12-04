@@ -1,11 +1,10 @@
-import sys
-import os
 import logging
+import os
+import sys
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -16,9 +15,11 @@ sys.path.append(os.path.dirname(current_dir))
 # ---------------------------
 
 try:
-    from database import engine, Base
+    from database import Base, engine
+
     # Importamos los modelos
-    from models import * # --- AQUi ESTABA EL ERROR (Debe haber un salto de linea) ---
+    from models import *  # --- AQUi ESTABA EL ERROR (Debe haber un salto de linea) ---
+
     def init_db():
         logger.info(f"Iniciando creacion de tablas en: {engine.url}")
         try:

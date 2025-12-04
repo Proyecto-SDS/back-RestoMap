@@ -13,10 +13,70 @@ Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestion de locale
 
 ## Requisitos
 
+### Para Producción (Docker)
+
 - Docker Desktop
 - Docker Compose
 
 **No se requiere instalacion local de Python ni PostgreSQL** - todo se ejecuta en contenedores Docker.
+
+### Para Desarrollo Local (Opcional)
+
+Si prefieres desarrollar localmente sin Docker:
+
+- **Python 3.12.10**
+- **Poetry** (gestor de dependencias)
+- **PostgreSQL 18** (opcional, puedes usar solo la BD en Docker)
+
+#### Instalación de Poetry
+
+```bash
+# Windows (PowerShell)
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+
+# Linux/macOS
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+Ver la [Guía de Poetry](.guias/POETRY_GUIDE.md) para más información.
+
+## Desarrollo Local con Poetry
+
+### Instalación de dependencias
+
+```bash
+# Configurar Poetry para crear el entorno en el proyecto
+poetry config virtualenvs.in-project true
+
+# Instalar todas las dependencias
+poetry install
+
+# Activar el entorno virtual
+poetry shell
+```
+
+### Ejecutar la aplicación localmente
+
+```bash
+# Asegúrate de tener PostgreSQL corriendo (Docker o local)
+docker-compose up db -d
+
+# Ejecutar el servidor
+poetry run python src/main.py
+```
+
+### Herramientas de desarrollo
+
+```bash
+# Linter y formateador (Ruff)
+poetry run ruff check .
+poetry run ruff format .
+
+# Type checker (Pyrefly)
+poetry run pyrefly check
+```
+
+Para más comandos y detalles, consulta la [Guía de Poetry](.guias/POETRY_GUIDE.md).
 
 ## Configuracion
 
@@ -333,12 +393,25 @@ Respuesta:
 
 ## Tecnologias
 
-- **Flask** 3.0.3 - Framework web
-- **SQLAlchemy** 2.0.29 - ORM
+### Backend
+
+- **Flask** 3.1.2 - Framework web
+- **SQLAlchemy** 2.0.44 - ORM
 - **Alembic** 1.17.2 - Migraciones de BD
-- **Pydantic** 2.12.4 - Validacion de datos
+- **Pydantic** 2.12.5 - Validacion de datos
 - **PostgreSQL** 18 - Base de datos
+- **Gunicorn** 23.0.0 - Servidor WSGI para producción
+
+### Herramientas de Desarrollo
+
+- **Poetry** - Gestión de dependencias
+- **Ruff** 0.14.8 - Linter y formateador
+- **Pyrefly** 0.44.1 - Type checker estático
+
+### Infraestructura
+
 - **Docker** - Contenedores
+- **Docker Compose** - Orquestación
 
 ## Flujo de Inicializacion
 

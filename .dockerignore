@@ -1,21 +1,138 @@
+# ========================================
+# Control de versiones
+# ========================================
+.git
+.gitignore
+.gitattributes
+
+# ========================================
+# Python - Cache y compilados
+# ========================================
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 .Python
-env/
+*.so
+
+# ========================================
+# Entornos virtuales (NO copiar al contenedor)
+# ========================================
 venv/
-pip-log.txt
-pip-delete-this-directory.txt
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# ========================================
+# Poetry
+# ========================================
+# NO ignorar pyproject.toml y poetry.lock - son necesarios
+# !pyproject.toml
+# !poetry.lock
+
+# Cache de Poetry
+.poetry/
+
+# ========================================
+# Variables de entorno
+# ========================================
+.env
+.env.*
+!.env.example
+
+# ========================================
+# IDEs y editores
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# ========================================
+# Testing y Coverage
+# ========================================
 .tox/
+.nox/
 .coverage
 .coverage.*
 .cache
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.hypothesisfs
 nosetests.xml
 coverage.xml
 *.cover
+.ruff_cache/
+.pyrefly_cache/
+
+# ========================================
+# Logs
+# ========================================
 *.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesisfs
+logs/
+log/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ========================================
+# Build y distribución
+# ========================================
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+wheels/
+*.whl
+
+# ========================================
+# Docker
+# ========================================
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# ========================================
+# Base de datos local
+# ========================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sql
+
+# ========================================
+# Archivos temporales
+# ========================================
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ========================================
+# Documentación y guías (opcional)
+# ========================================
+README.md
+.guias/
+docs/
+
+# ========================================
+# Scripts de desarrollo (opcional)
+# ========================================
+# scripts/
+
+# ========================================
+# Archivos de migraciones antiguas (opcional)
+# ========================================
+# alembic/versions/

@@ -1,8 +1,4 @@
 {
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.formatOnSave": true,
-  "typescript.validate.enable": false,
-  "javascript.validate.enable": false,
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true
@@ -11,11 +7,24 @@
   "pyrefly.enabled": true,
   "pyrefly.autocheck": true,
   "pyrefly.configFile": "pyrefly.toml",
+  // Configuracion de Ruff - Linter y Formatter
+  "ruff.enable": true,
+  "ruff.nativeServer": "on",
+  "ruff.fixAll": true,
+  "ruff.organizeImports": true,
+  "ruff.codeAction.disableRuleComment": {
+    "enable": true
+  },
+  "ruff.codeAction.fixViolation": {
+    "enable": true
+  },
   // Configuracion de Python
-  "python.languageServer": "Pylance",
-  "python.analysis.typeCheckingMode": "off",
   "[python]": {
     "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
     "editor.rulers": [88, 120]
   }
 }

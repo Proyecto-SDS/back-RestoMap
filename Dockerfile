@@ -8,13 +8,22 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar el archivo de requerimientos
-COPY requirements.txt .
+# Instalar Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
 
-# Instalar las dependencias de Python
-RUN pip install --no-cache-dir -r requirements.txt
+# Configurar Poetry para no crear entornos virtuales (usamos el del contenedor)
+ENV POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1
+
+# Copiar archivos de configuración de Poetry
+COPY pyproject.toml poetry.lock ./
+
+# Instalar solo dependencias de producción (sin dev)
+RUN poetry install --no-root --only main
 
 # Copiar el codigo de la aplicacion
 COPY . .

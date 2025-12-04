@@ -1,39 +1,144 @@
-# Archivos de python
+# ========================================
+# Python
+# ========================================
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.so
+*.pyc
 
-# Entornos virtuales
+# ========================================
+# Entornos Virtuales
+# ========================================
 venv/
+env/
 .env/
 .venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Archivos de configuracion locales
+# ========================================
+# Poetry
+# ========================================
+# NO ignorar poetry.lock - debe estar en el repositorio
+# poetry.lock
+
+# Cache de Poetry (opcional, generalmente se ignora)
+.poetry/
+
+# ========================================
+# Variables de Entorno y Secretos
+# ========================================
+.env
+.env.local
+.env.*.local
 *.env
 
-# logs
+# ========================================
+# IDEs y Editores
+# ========================================
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ========================================
+# Logs
+# ========================================
 *.log
 logs/
 log/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# carpetas extra
+# ========================================
+# Build y Distribución
+# ========================================
 build/
 dist/
 *.egg-info/
+.eggs/
+*.egg
+wheels/
+*.whl
 
-# Cache en general
+# ========================================
+# Cache
+# ========================================
 *.cache/
 .cache/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pyrefly_cache/
 
-# Archivos temporales
+# ========================================
+# Archivos Temporales
+# ========================================
 *.tmp
 *.temp
 *~
+.DS_Store
+Thumbs.db
 
+# ========================================
 # Docker
+# ========================================
 docker-compose.override.yml
+.dockerignore
 
-# Bases de datos locales
+# ========================================
+# Base de Datos
+# ========================================
 *.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ========================================
+# Coverage y Testing
+# ========================================
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ========================================
+# Jupyter Notebook
+# ========================================
+.ipynb_checkpoints
+*.ipynb
+
+# ========================================
+# Otros
+# ========================================
+.Python
+*.manifest
+*.spec
+instance/
+.webassets-cache
+.scrapy
+docs/_build/
+target/
+.pybuilder/

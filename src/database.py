@@ -2,11 +2,13 @@
 Configuracion de la base de datos PostgreSQL
 Gestiona la conexion, engine y sesiones de SQLAlchemy
 """
+
 import os
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 # Cargar variables de entorno desde .env (solo para local)
 load_dotenv()
@@ -20,11 +22,13 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 # Usamos '5432' por defecto si no existe la variable, para evitar errores en Cloud Run
-DB_PORT = os.getenv("DB_PORT", "5432") 
+DB_PORT = os.getenv("DB_PORT", "5432")
 
 # Validar solo las variables CRiTICAS (Quitamos DB_PORT de la validacion obligatoria)
 if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_NAME]):
-    raise ValueError("Faltan variables de entorno criticas (DB_USER, DB_PASSWORD, DB_HOST o DB_NAME).")
+    raise ValueError(
+        "Faltan variables de entorno criticas (DB_USER, DB_PASSWORD, DB_HOST o DB_NAME)."
+    )
 
 # --- LoGICA DE CONEXIoN HiBRIDA (CLOUD RUN vs LOCAL) ---
 # pyrefly: ignore [missing-attribute]
@@ -47,6 +51,7 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 # Crear sesion global con scoped_session (thread-safe)
 db_session = scoped_session(SessionLocal)
 
+
 # Funcion helper para obtener sesiones en otros contextos
 def get_db():
     """
@@ -58,5 +63,6 @@ def get_db():
     finally:
         db.close()
 
+
 # Exponer elementos
-__all__ = ["Base", "engine", "DATABASE_URL", "db_session", "SessionLocal", "get_db"]
+__all__ = ["DATABASE_URL", "Base", "SessionLocal", "db_session", "engine", "get_db"]
