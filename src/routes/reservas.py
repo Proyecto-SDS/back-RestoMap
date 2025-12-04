@@ -131,6 +131,24 @@ def crear_reserva(user_id, _user_rol):
                 }
             ), 400
 
+        # Verificar que el usuario no tenga ya una reserva activa en este local
+        reserva_activa_usuario = (
+            db_session.query(Reserva)
+            .filter(
+                Reserva.id_usuario == user_id,
+                Reserva.id_local == local_id,
+                Reserva.estado == EstadoReservaEnum.PENDIENTE,
+            )
+            .first()
+        )
+
+        if reserva_activa_usuario:
+            return jsonify(
+                {
+                    "error": "Ya tienes una reserva pendiente en este restaurante. Debes cancelarla antes de crear una nueva."
+                }
+            ), 400
+
         # Verificar disponibilidad de la mesa para esa fecha y hora
         # Considerar un rango de ±75 minutos (1 hora y 15 minutos)
         hora_inicio = (
@@ -193,6 +211,7 @@ def crear_reserva(user_id, _user_rol):
                 # pyrefly: ignore [bad-argument-type]
                 id_reserva=nueva_reserva.id,
                 id_mesa=mesa_id,
+                id_usuario=user_id,
                 minutos_tolerancia=10,  # Expira 10 minutos después de la hora de reserva
             )
             logger.info(f"[DEBUG] QR generado exitosamente. Codigo: {codigo_qr}")

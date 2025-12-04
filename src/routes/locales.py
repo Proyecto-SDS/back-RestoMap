@@ -713,3 +713,113 @@ def obtener_mesas_disponibles(id):
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+@locales_bp.route("/<int:id>/verificar-reserva-activa", methods=["GET"])
+def verificar_reserva_activa(id):
+    """
+    Verifica si el usuario autenticado tiene una reserva activa en este local.
+    Requiere autenticación.
+    """
+    try:
+        from utils.jwt_helper import verificar_token
+
+        # Obtener token del header Authorization
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            # Si no hay token, retornar que no hay reserva (usuario no autenticado)
+            return jsonify({"tieneReservaActiva": False}), 200
+
+        # Verificar formato "Bearer {token}"
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            return jsonify({"tieneReservaActiva": False}), 200
+
+        token = parts[1]
+        payload = verificar_token(token)
+        if not payload:
+            return jsonify({"tieneReservaActiva": False}), 200
+
+        user_id = payload["user_id"]
+
+        # Verificar que el local existe
+        local = db_session.query(Local).filter(Local.id == id).first()
+        if not local:
+            return jsonify({"error": "Local no encontrado"}), 404
+
+        # Buscar reserva activa del usuario en este local
+        reserva_activa = (
+            db_session.query(Reserva)
+            .filter(
+                Reserva.id_usuario == user_id,
+                Reserva.id_local == id,
+                Reserva.estado == "pendiente",
+            )
+            .first()
+        )
+
+        if reserva_activa:
+            # Obtener código QR activo
+            qr_codigo = None
+            qr_base64 = None
+            if reserva_activa.qr_dinamicos:
+                # Buscar el QR más reciente o activo
+                qr = next((q for q in reserva_activa.qr_dinamicos if q.activo), None)
+                if qr:
+                    qr_codigo = qr.codigo
+                    # Generar imagen QR
+                    import json
+
+                    from services.qr_service import generar_qr_imagen
+
+                    # Obtener mesa de la reserva
+                    mesa_id = None
+                    if reserva_activa.reservas_mesa:
+                        mesa_id = reserva_activa.reservas_mesa[0].id_mesa
+
+                    try:
+                        qr_data = {
+                            "tipo": "reserva",
+                            "codigo": qr_codigo,
+                            "reserva_id": reserva_activa.id,
+                            "mesa_id": mesa_id,
+                            "local_id": reserva_activa.id_local,
+                            "fecha": reserva_activa.fecha_reserva.isoformat()
+                            if reserva_activa.fecha_reserva
+                            else None,
+                            "hora": reserva_activa.hora_reserva.strftime("%H:%M")
+                            if reserva_activa.hora_reserva
+                            else None,
+                        }
+                        qr_string = json.dumps(qr_data)
+                        qr_base64 = generar_qr_imagen(qr_string)
+                    except Exception as e:
+                        print(
+                            f"Error generando QR para reserva {reserva_activa.id}: {e}"
+                        )
+
+            return jsonify(
+                {
+                    "tieneReservaActiva": True,
+                    "reserva": {
+                        "id": reserva_activa.id,
+                        "fecha": reserva_activa.fecha_reserva.strftime("%Y-%m-%d")
+                        if reserva_activa.fecha_reserva
+                        else None,
+                        "hora": reserva_activa.hora_reserva.strftime("%H:%M")
+                        if reserva_activa.hora_reserva
+                        else None,
+                        "estado": reserva_activa.estado.value
+                        if reserva_activa.estado
+                        else "pendiente",
+                        "codigoQR": qr_codigo or f"RES-{reserva_activa.id}",
+                        "qrImage": qr_base64,
+                    },
+                }
+            ), 200
+        else:
+            return jsonify({"tieneReservaActiva": False}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

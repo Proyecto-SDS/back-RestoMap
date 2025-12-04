@@ -55,7 +55,7 @@ def generar_qr_imagen(data: str, size: int = 10) -> str:
 
 
 def crear_qr_reserva(
-    id_reserva: int, id_mesa: int, minutos_tolerancia: int = 10
+    id_reserva: int, id_mesa: int, id_usuario: int, minutos_tolerancia: int = 10
 ) -> tuple[str, str]:
     """
     Crea un QR dinamico para una reserva
@@ -63,6 +63,7 @@ def crear_qr_reserva(
     Args:
         id_reserva: ID de la reserva
         id_mesa: ID de la mesa asociada
+        id_usuario: ID del usuario que realiza la reserva
         minutos_tolerancia: Minutos de tolerancia después de la hora de reserva (default: 10 minutos)
 
     Returns:
@@ -105,6 +106,7 @@ def crear_qr_reserva(
         id_mesa=id_mesa,
         id_reserva=id_reserva,
         id_pedido=None,
+        id_usuario=id_usuario,
         codigo=codigo,
         expiracion=expiracion,
         activo=True,
@@ -176,6 +178,7 @@ def crear_qr_pedido(
         id_mesa=id_mesa,
         id_pedido=id_pedido,
         id_reserva=None,
+        id_usuario=None,
         codigo=codigo,
         expiracion=expiracion,
         activo=True,

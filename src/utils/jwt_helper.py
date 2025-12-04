@@ -90,9 +90,8 @@ def requerir_auth(f):
         if not payload:
             return jsonify({"error": "Token invalido o expirado"}), 401
 
-        # Agregar user_id y _user_rol al contexto de la funcion
-        kwargs["_user_id"] = payload["_user_id"]
-        kwargs["_user_rol"] = payload["_rol"]
+        kwargs["user_id"] = payload["user_id"]
+        kwargs["_user_rol"] = payload["rol"]
 
         return f(*args, **kwargs)
 
