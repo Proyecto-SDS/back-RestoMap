@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Optional, List, Dict
 
 from sqlalchemy import (
-    Column, Integer, String, Text, ForeignKey, DateTime, Date, Time,
+    Table, Column, Integer, String, Text, ForeignKey, DateTime, Date, Time,
     Boolean, Numeric, SmallInteger, Enum, UniqueConstraint, Index, func
 )
 from sqlalchemy.orm import relationship
@@ -373,6 +373,8 @@ class Local(Base):
     reservas = relationship("Reserva", back_populates="local", lazy="select", cascade="all, delete-orphan")
     pedidos = relationship("Pedido", back_populates="local", lazy="select", cascade="all, delete-orphan")
     empleados = relationship("Usuario", back_populates="local", lazy="select")
+    local_roles = relationship("LocalRol", back_populates="local", lazy="select", cascade="all, delete-orphan")
+    local_empleados = relationship("LocalEmpleado", back_populates="local", lazy="select", cascade="all, delete-orphan")
 
 class Horario(Base):
     __tablename__ = "horario"
@@ -665,6 +667,50 @@ class Pago(Base):
     actualizado_el = Column(DateTime(timezone=True), onupdate=func.now())
     
     pedido = relationship("Pedido", back_populates="pagos", lazy="joined")
+
+
+# ============================================
+# ROLES Y PERMISOS A NIVEL DE LOCAL
+# ============================================
+
+# Tabla de asociación entre roles de local y permisos
+local_rol_permiso = Table(
+    'local_rol_permiso',
+    Base.metadata,
+    Column('id_local_rol', Integer, ForeignKey('local_rol.id', ondelete='CASCADE'), primary_key=True),
+    Column('id_permiso', Integer, ForeignKey('permiso.id', ondelete='CASCADE'), primary_key=True),
+)
+
+
+class LocalRol(Base):
+    __tablename__ = 'local_rol'
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_local = Column(Integer, ForeignKey('local.id', ondelete='CASCADE'), nullable=False, index=True)
+    nombre = Column(String(150), nullable=False)
+    descripcion = Column(String(500), nullable=True)
+
+    local = relationship('Local', back_populates='local_roles', lazy='joined')
+    permisos = relationship('Permiso', secondary=local_rol_permiso, lazy='select', backref='local_roles')
+    empleados = relationship('LocalEmpleado', back_populates='local_rol', lazy='select')
+
+
+class LocalEmpleado(Base):
+    __tablename__ = 'local_empleado'
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_local = Column(Integer, ForeignKey('local.id', ondelete='CASCADE'), nullable=False, index=True)
+    id_usuario = Column(Integer, ForeignKey('usuario.id', ondelete='CASCADE'), nullable=True, index=True)
+    id_local_rol = Column(Integer, ForeignKey('local_rol.id', ondelete='SET NULL'), nullable=True, index=True)
+    invitacion_codigo = Column(String(255), nullable=True, unique=True)
+    aceptado_el = Column(DateTime(timezone=True), nullable=True)
+    activo = Column(Boolean, default=True, nullable=False)
+    creado_el = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+
+    local = relationship('Local', back_populates='local_empleados', lazy='joined')
+    usuario = relationship('Usuario', lazy='joined')
+    local_rol = relationship('LocalRol', back_populates='empleados', lazy='joined')
+
 
 # ============================================
 # SCHEMAS PYDANTIC V2

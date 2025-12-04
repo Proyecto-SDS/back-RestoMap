@@ -8,7 +8,7 @@ from datetime import datetime
 import logging
 import bcrypt
 from database import db_session
-from models import Mesa, Producto, Local, Categoria, Usuario, Rol, EstadoMesaEnum, EstadoProductoEnum, Reserva, ReservaMesa, EstadoReservaEnum
+from models import Mesa, Producto, Local, Categoria, Usuario, Rol, EstadoMesaEnum, EstadoProductoEnum, Reserva, ReservaMesa, EstadoReservaEnum, LocalRol, LocalEmpleado, Permiso
 from utils.jwt_helper import requerir_auth
 
 logger = logging.getLogger(__name__)
@@ -281,6 +281,217 @@ def crear_empleado(user_id, user_rol):
         logger.error(f"Error al crear empleado: {e}")
         db_session.rollback()
         return jsonify({"error": "Error al crear el empleado", "detalle": str(e)}), 500
+
+
+# =============================
+# Roles y Permisos a nivel Local
+# =============================
+
+
+@gestionlocal_bp.route('/personal/roles', methods=['POST'])
+@requerir_auth
+def crear_rol_local(user_id, user_rol):
+    """Crear un rol específico para el local del gerente"""
+    try:
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario sin local asignado'}), 403
+        if not usuario.rol or usuario.rol.nombre != 'gerente':
+            return jsonify({'error': 'Solo gerentes pueden crear roles de local'}), 403
+        data = request.get_json() or {}
+        nombre = data.get('nombre', '').strip()
+        descripcion = data.get('descripcion', '')
+        if not nombre:
+            return jsonify({'error': 'Nombre de rol requerido'}), 400
+        # Verificar existencia
+        existe = db_session.query(LocalRol).filter_by(id_local=usuario.id_local, nombre=nombre).first()
+        if existe:
+            return jsonify({'error': 'Ya existe un rol con ese nombre en el local'}), 400
+        nuevo = LocalRol(id_local=usuario.id_local, nombre=nombre, descripcion=descripcion)
+        db_session.add(nuevo)
+        db_session.commit()
+        return jsonify({'success': True, 'rol_id': nuevo.id}), 201
+    except Exception as e:
+        logger.error(f"Error al crear rol local: {e}")
+        db_session.rollback()
+        return jsonify({'error': 'Error al crear rol local'}), 500
+
+
+@gestionlocal_bp.route('/personal/roles', methods=['GET'])
+@requerir_auth
+def listar_roles_local(user_id, user_rol):
+    try:
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario sin local asignado'}), 403
+        roles = db_session.query(LocalRol).filter_by(id_local=usuario.id_local).all()
+        return jsonify([{'id': r.id, 'nombre': r.nombre, 'descripcion': r.descripcion} for r in roles]), 200
+    except Exception as e:
+        logger.error(f"Error al listar roles locales: {e}")
+        return jsonify({'error': 'Error al listar roles locales'}), 500
+
+
+@gestionlocal_bp.route('/personal/roles/<int:rol_id>/permisos', methods=['PUT'])
+@requerir_auth
+def asignar_permisos_rol_local(user_id, user_rol, rol_id):
+    try:
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario sin local asignado'}), 403
+        if not usuario.rol or usuario.rol.nombre != 'gerente':
+            return jsonify({'error': 'Solo gerentes pueden asignar permisos a roles'}), 403
+        data = request.get_json() or {}
+        permisos_ids = data.get('permisos', [])
+        rol = db_session.query(LocalRol).filter_by(id=rol_id, id_local=usuario.id_local).first()
+        if not rol:
+            return jsonify({'error': 'Rol no encontrado en tu local'}), 404
+        # Asignar permisos (se usan Permiso globales)
+        permisos_objs = []
+        if permisos_ids:
+            permisos_objs = db_session.query(Permiso).filter(Permiso.id.in_(permisos_ids)).all()
+        rol.permisos = permisos_objs
+        db_session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Error al asignar permisos rol local: {e}")
+        db_session.rollback()
+        return jsonify({'error': 'Error al asignar permisos'}), 500
+
+
+# =============================
+# Invitaciones y gestión de personal operativo por Local (CU-11)
+# =============================
+
+
+@gestionlocal_bp.route('/personal/invite', methods=['POST'])
+@requerir_auth
+def invite_local_employee(user_id, user_rol):
+    """Genera una invitación única para que un empleado se registre y se vincule al local"""
+    try:
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario sin local asignado'}), 403
+        if not usuario.rol or usuario.rol.nombre != 'gerente':
+            return jsonify({'error': 'Solo gerentes pueden invitar personal'}), 403
+        data = request.get_json() or {}
+        correo = data.get('correo', '').strip().lower()
+        rol_nombre = data.get('rol', '')
+        if not correo or not rol_nombre:
+            return jsonify({'error': 'Correo y rol son requeridos'}), 400
+        # Buscar rol local
+        rol_local = db_session.query(LocalRol).filter_by(id_local=usuario.id_local, nombre=rol_nombre).first()
+        if not rol_local:
+            return jsonify({'error': 'Rol local no existe. Créalo primero.'}), 400
+        # Generar código
+        import uuid
+        codigo = str(uuid.uuid4())
+        # Verificar usuario existente
+        usuario_existente = db_session.query(Usuario).filter_by(correo=correo).first()
+        if usuario_existente:
+            nuevo = LocalEmpleado(id_local=usuario.id_local, id_usuario=usuario_existente.id, id_local_rol=rol_local.id, invitacion_codigo=codigo, activo=False)
+        else:
+            nuevo = LocalEmpleado(id_local=usuario.id_local, id_usuario=None, id_local_rol=rol_local.id, invitacion_codigo=codigo, activo=False)
+        db_session.add(nuevo)
+        db_session.commit()
+        # En producción enviar correo con el enlace que contiene el código
+        return jsonify({'success': True, 'codigo_invitacion': codigo}), 201
+    except Exception as e:
+        logger.error(f"Error al generar invitación local: {e}")
+        db_session.rollback()
+        return jsonify({'error': 'Error al generar la invitación'}), 500
+
+
+@gestionlocal_bp.route('/personal/invite/accept', methods=['POST'])
+def accept_local_invite():
+    """Aceptar invitación para unirse al local usando el código"""
+    try:
+        data = request.get_json() or {}
+        codigo = data.get('codigo')
+        if not codigo:
+            return jsonify({'error': 'Código requerido'}), 400
+        invit = db_session.query(LocalEmpleado).filter_by(invitacion_codigo=codigo).first()
+        if not invit:
+            return jsonify({'error': 'Código inválido'}), 404
+        correo = data.get('correo', '').strip().lower()
+        nombre = data.get('nombre', '').strip()
+        contrasena = data.get('contrasena')
+        telefono = data.get('telefono')
+        # Si no existe usuario asociado, crear
+        if not invit.id_usuario:
+            if not correo or not nombre or not contrasena:
+                return jsonify({'error': 'Se requieren nombre, correo y contraseña para crear la cuenta'}), 400
+            usuario_existente = db_session.query(Usuario).filter_by(correo=correo).first()
+            if usuario_existente:
+                invit.id_usuario = usuario_existente.id
+            else:
+                import bcrypt
+                hashed = bcrypt.hashpw(contrasena.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                # Asignar rol global por defecto 'cliente' o 'usuario' según seed; usaremos 'mesero' si rol global no found? Use 'cliente'
+                rol_global = db_session.query(Rol).filter_by(nombre='cliente').first()
+                rol_global_id = rol_global.id if rol_global else None
+                nuevo_u = Usuario(nombre=nombre, correo=correo, contrasena=hashed, telefono=telefono, id_rol=rol_global_id, id_local=invit.id_local, creado_el=datetime.utcnow())
+                db_session.add(nuevo_u)
+                db_session.flush()
+                invit.id_usuario = nuevo_u.id
+        # Vincular el usuario al local y marcar aceptado
+        usuario_obj = db_session.query(Usuario).filter_by(id=invit.id_usuario).first()
+        if usuario_obj and not usuario_obj.id_local:
+            usuario_obj.id_local = invit.id_local
+        invit.aceptado_el = datetime.utcnow()
+        invit.activo = True
+        invit.invitacion_codigo = None
+        db_session.commit()
+        return jsonify({'success': True, 'message': 'Invitación aceptada'}), 200
+    except Exception as e:
+        logger.error(f"Error al aceptar invitación local: {e}")
+        db_session.rollback()
+        return jsonify({'error': 'Error al aceptar la invitación'}), 500
+
+
+@gestionlocal_bp.route('/personal/invitaciones', methods=['GET'])
+@requerir_auth
+def listar_invitaciones_local(user_id, user_rol):
+    try:
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario sin local asignado'}), 403
+        if not usuario.rol or usuario.rol.nombre != 'gerente':
+            return jsonify({'error': 'Solo gerentes pueden listar invitaciones'}), 403
+        invs = db_session.query(LocalEmpleado).filter_by(id_local=usuario.id_local, activo=False).all()
+        return jsonify([{'id': i.id, 'correo': i.usuario.correo if i.usuario else None, 'rol': i.local_rol.nombre if i.local_rol else None, 'codigo': i.invitacion_codigo} for i in invs]), 200
+    except Exception as e:
+        logger.error(f"Error al listar invitaciones: {e}")
+        return jsonify({'error': 'Error al listar invitaciones'}), 500
+
+
+@gestionlocal_bp.route('/personal/<int:empleado_id>', methods=['PUT'])
+@requerir_auth
+def actualizar_empleado_local(user_id, user_rol, empleado_id):
+    try:
+        usuario = db_session.query(Usuario).filter_by(id=user_id).first()
+        if not usuario or not usuario.id_local:
+            return jsonify({'error': 'Usuario sin local asignado'}), 403
+        if not usuario.rol or usuario.rol.nombre != 'gerente':
+            return jsonify({'error': 'Solo gerentes pueden actualizar empleados'}), 403
+        data = request.get_json() or {}
+        activo = data.get('activo')
+        rol_nombre = data.get('rol')
+        le = db_session.query(LocalEmpleado).filter_by(id=empleado_id, id_local=usuario.id_local).first()
+        if not le:
+            return jsonify({'error': 'Empleado no encontrado en tu local'}), 404
+        if activo is not None:
+            le.activo = bool(activo)
+        if rol_nombre:
+            rol_local = db_session.query(LocalRol).filter_by(id_local=usuario.id_local, nombre=rol_nombre).first()
+            if not rol_local:
+                return jsonify({'error': 'Rol local no encontrado'}), 400
+            le.id_local_rol = rol_local.id
+        db_session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Error al actualizar empleado local: {e}")
+        db_session.rollback()
+        return jsonify({'error': 'Error al actualizar empleado'}), 500
 
 # ============================================
 # ENDPOINTS DE CATEGORÍAS
