@@ -4,57 +4,19 @@ Backend - Sistema de Gestion de Locales
 """
 
 import logging
-import os
 
 from flask import Flask, jsonify
 from flask_cors import CORS
 
+from config import Config
 from database import db_session
+from middleware import register_middleware
 
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-
-class Config:
-    """Clase de configuracion centralizada"""
-
-    # Configuracion general
-    JSON_SORT_KEYS = False
-    JSON_AS_ASCII = False  # Permite caracteres UTF-8 en JSON
-
-    # CORS
-    ALLOWED_ORIGINS = os.environ.get(
-        "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001"
-    ).split(",")
-
-    # Servidor
-    PORT = int(os.environ.get("PORT", "5000"))
-    ENV = os.environ.get("ENV", "production")
-    DEBUG = ENV in ["dev", "development"]
-
-    # Seguridad
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-
-    @classmethod
-    def validate(cls) -> None:
-        """Valida que las variables criticas estén configuradas"""
-        if not cls.JWT_SECRET_KEY:
-            logger.warning(
-                "JWT_SECRET_KEY no está configurado. Usando valor por defecto."
-            )
-
-        if cls.ENV == "production" and cls.DEBUG:
-            logger.warning("DEBUG está activado en produccion. Esto es peligroso.")
-
-        if (
-            cls.ENV == "production"
-            and cls.JWT_SECRET_KEY == "dev-secret-key-change-in-production-2025"
-        ):
-            logger.error("CRiTICO: Usando clave JWT de desarrollo en produccion!")
-            raise ValueError("JWT_SECRET_KEY debe ser cambiado en produccion")
 
 
 def create_app(config: Config | None = None) -> Flask:
@@ -89,8 +51,8 @@ def create_app(config: Config | None = None) -> Flask:
     # Configurar manejo de base de datos
     _configure_database(app)
 
-    # Registrar error handlers
-    _register_error_handlers(app)
+    # Registrar middleware (error handlers, logging, request ID)
+    register_middleware(app)
 
     # Registrar blueprints
     _register_blueprints(app)
@@ -99,8 +61,8 @@ def create_app(config: Config | None = None) -> Flask:
     _register_basic_routes(app)
 
     logger.info("Aplicacion Flask creada correctamente")
-    logger.info(f"🌍 Entorno: {config.ENV}")
-    logger.info(f"🐛 Debug: {config.DEBUG}")
+    logger.info(f"Entorno: {config.ENV}")
+    logger.info(f"Debug: {config.DEBUG}")
     logger.info(f"CORS permitido desde: {', '.join(config.ALLOWED_ORIGINS)}")
 
     return app
@@ -292,8 +254,8 @@ if __name__ == "__main__":
     logger.info("Iniciando servidor Flask de desarrollo")
     logger.info("=" * 60)
     logger.info(f"Puerto: {Config.PORT}")
-    logger.info(f"🐛 Modo debug: {Config.DEBUG}")
-    logger.info(f"🌍 Entorno: {Config.ENV}")
+    logger.info(f"Modo debug: {Config.DEBUG}")
+    logger.info(f"Entorno: {Config.ENV}")
     logger.info("=" * 60)
 
     if Config.ENV == "production":

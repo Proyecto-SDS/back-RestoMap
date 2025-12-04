@@ -1,3 +1,62 @@
+CREATE TYPE "EstadoMesaEnum" AS ENUM (
+  'disponible',
+  'reservada',
+  'ocupada',
+  'fuera_de_servicio'
+);
+
+CREATE TYPE "EstadoPedidoEnum" AS ENUM (
+  'iniciado',
+  'recepcion',
+  'en_proceso',
+  'terminado',
+  'completado',
+  'cancelado'
+);
+
+CREATE TYPE "EstadoProductoEnum" AS ENUM (
+  'disponible',
+  'agotado',
+  'inactivo'
+);
+
+CREATE TYPE "EstadoReservaEnum" AS ENUM (
+  'pendiente',
+  'confirmada',
+  'rechazada',
+  'expirada'
+);
+
+CREATE TYPE "EstadoEncomiendaEnum" AS ENUM (
+  'pendiente',
+  'en_preparacion',
+  'lista',
+  'entregada',
+  'cancelada'
+);
+
+CREATE TYPE "MetodoPagoEnum" AS ENUM (
+  'efectivo',
+  'transferencia',
+  'debito',
+  'credito',
+  'app_de_pago',
+  'otro'
+);
+
+CREATE TYPE "EstadoPagoEnum" AS ENUM (
+  'pendiente',
+  'cobrado',
+  'cancelado'
+);
+
+CREATE TYPE "TipoHorarioEnum" AS ENUM (
+  'normal',
+  'especial',
+  'evento',
+  'cerrado'
+);
+
 CREATE TABLE "Rol" (
   "id" integer PRIMARY KEY,
   "nombre" varchar(100) UNIQUE NOT NULL
@@ -31,7 +90,7 @@ CREATE TABLE "Categoria" (
 CREATE TABLE "Direccion" (
   "id" integer PRIMARY KEY,
   "id_comuna" integer,
-  "calle" varchar(100) NOT NULL,
+  "calle" varchar(200) NOT NULL,
   "numero" integer NOT NULL,
   "longitud" decimal NOT NULL,
   "latitud" decimal NOT NULL
@@ -41,7 +100,7 @@ CREATE TABLE "Local" (
   "id" integer PRIMARY KEY,
   "id_direccion" integer NOT NULL,
   "id_tipo_local" integer NOT NULL,
-  "descripcion" varchar(200) NOT NULL,
+  "descripcion" text,
   "nombre" varchar(200) NOT NULL,
   "telefono" integer NOT NULL,
   "correo" varchar(50) UNIQUE NOT NULL
@@ -50,7 +109,7 @@ CREATE TABLE "Local" (
 CREATE TABLE "Horario" (
   "id" integer PRIMARY KEY,
   "id_local" integer NOT NULL,
-  "tipo" varchar(50) NOT NULL,
+  "tipo" "TipoHorarioEnum" NOT NULL,
   "fecha_inicio" date NOT NULL,
   "fecha_fin" date NOT NULL,
   "dia_semana" smallint NOT NULL,
@@ -66,7 +125,7 @@ CREATE TABLE "Mesa" (
   "nombre" varchar(30) NOT NULL,
   "descripcion" varchar(100),
   "capacidad" smallint NOT NULL,
-  "estado" varchar(50) NOT NULL
+  "estado" "EstadoMesaEnum" NOT NULL DEFAULT 'disponible'
 );
 
 CREATE TABLE "Usuario" (
@@ -77,7 +136,7 @@ CREATE TABLE "Usuario" (
   "telefono" varchar(32),
   "id_rol" integer,
   "id_local" integer,
-  "creado_el" timestamp NOT NULL
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP'
 );
 
 CREATE TABLE "Foto" (
@@ -104,7 +163,7 @@ CREATE TABLE "Producto" (
   "id_categoria" integer,
   "nombre" varchar(100) NOT NULL,
   "descripcion" varchar(500),
-  "estado" varchar(50) NOT NULL,
+  "estado" "EstadoProductoEnum" NOT NULL DEFAULT 'disponible',
   "precio" integer NOT NULL
 );
 
@@ -114,7 +173,7 @@ CREATE TABLE "Opinion" (
   "id_local" integer NOT NULL,
   "puntuacion" numeric(2,1) NOT NULL,
   "comentario" varchar(500) NOT NULL,
-  "creado_el" timestamp NOT NULL,
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP',
   "eliminado_el" timestamp
 );
 
@@ -122,7 +181,7 @@ CREATE TABLE "Favorito" (
   "id" integer PRIMARY KEY,
   "id_usuario" integer NOT NULL,
   "id_local" integer NOT NULL,
-  "agregado_el" timestamp NOT NULL
+  "agregado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP'
 );
 
 CREATE TABLE "Reserva" (
@@ -131,16 +190,15 @@ CREATE TABLE "Reserva" (
   "id_usuario" integer NOT NULL,
   "fecha_reserva" date NOT NULL,
   "hora_reserva" time NOT NULL,
-  "estado" varchar(50) NOT NULL,
-  "creado_el" timestamp NOT NULL,
+  "estado" "EstadoReservaEnum" NOT NULL DEFAULT 'pendiente',
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP',
   "expirado_el" timestamp
 );
 
 CREATE TABLE "ReservaMesa" (
   "id" integer PRIMARY KEY,
   "id_reserva" integer NOT NULL,
-  "id_mesa" integer NOT NULL,
-  "prioridad" varchar(50) NOT NULL
+  "id_mesa" integer NOT NULL
 );
 
 CREATE TABLE "QRDinamico" (
@@ -152,7 +210,7 @@ CREATE TABLE "QRDinamico" (
   "codigo" varchar(255) UNIQUE NOT NULL,
   "expiracion" timestamp NOT NULL,
   "activo" boolean NOT NULL DEFAULT true,
-  "creado_el" timestamp NOT NULL
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP'
 );
 
 CREATE TABLE "Pedido" (
@@ -162,9 +220,9 @@ CREATE TABLE "Pedido" (
   "id_usuario" integer NOT NULL,
   "id_qr" integer NOT NULL,
   "creado_por" integer NOT NULL,
-  "estado" varchar(50) NOT NULL DEFAULT 'iniciado',
+  "estado" "EstadoPedidoEnum" NOT NULL DEFAULT 'iniciado',
   "total" integer NOT NULL DEFAULT 0,
-  "creado_el" timestamp NOT NULL,
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP',
   "actualizado_el" timestamp
 );
 
@@ -175,23 +233,23 @@ CREATE TABLE "Cuenta" (
   "creado_por" integer NOT NULL,
   "cantidad" integer NOT NULL,
   "observaciones" varchar(500),
-  "creado_el" timestamp NOT NULL
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP'
 );
 
 CREATE TABLE "EstadoPedido" (
   "id" integer PRIMARY KEY,
   "id_pedido" integer NOT NULL,
-  "estado" varchar(50) NOT NULL,
+  "estado" "EstadoPedidoEnum" NOT NULL,
   "creado_por" integer NOT NULL,
-  "creado_el" timestamp NOT NULL,
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP',
   "nota" varchar(200)
 );
 
 CREATE TABLE "Encomienda" (
   "id" integer PRIMARY KEY,
   "id_pedido" integer NOT NULL,
-  "estado" varchar(50) NOT NULL,
-  "creado_el" timestamp NOT NULL
+  "estado" "EstadoEncomiendaEnum" NOT NULL,
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP'
 );
 
 CREATE TABLE "EncomiendaCuenta" (
@@ -204,10 +262,10 @@ CREATE TABLE "Pago" (
   "id" integer PRIMARY KEY,
   "id_pedido" integer NOT NULL,
   "creado_por" integer NOT NULL,
-  "metodo" varchar(50) NOT NULL,
-  "estado" varchar(50) NOT NULL,
+  "metodo" "MetodoPagoEnum" NOT NULL,
+  "estado" "EstadoPagoEnum" NOT NULL DEFAULT 'pendiente',
   "monto" integer NOT NULL,
-  "creado_el" timestamp NOT NULL,
+  "creado_el" timestamp NOT NULL DEFAULT 'CURRENT_TIMESTAMP',
   "actualizado_el" timestamp
 );
 
@@ -328,6 +386,12 @@ CREATE INDEX ON "Pago" ("creado_por");
 CREATE INDEX ON "Pago" ("estado");
 
 CREATE INDEX ON "Pago" ("creado_el");
+
+COMMENT ON TABLE "Reserva" IS 'PRIORIDAD SE CALCULA DINÁMICAMENTE EN BACKEND según fecha-hora';
+
+COMMENT ON TABLE "ReservaMesa" IS 'Campo prioridad eliminado - se calcula dinámicamente en backend';
+
+COMMENT ON TABLE "EstadoPedido" IS 'Auditoría completa de cambios de estado';
 
 ALTER TABLE "Direccion" ADD FOREIGN KEY ("id_comuna") REFERENCES "Comuna" ("id");
 

@@ -23,7 +23,6 @@ from .models import (
     EstadoPedidoEnum,
     EstadoProductoEnum,
     EstadoReservaEnum,
-    EstadoReservaMesaEnum,
     Favorito,
     # ============ Modelos - Multimedia ============
     Foto,
@@ -93,7 +92,6 @@ __all__ = [
     "EstadoPedidoEnum",
     "EstadoProductoEnum",
     "EstadoReservaEnum",
-    "EstadoReservaMesaEnum",
     "Favorito",
     # Modelos - Multimedia
     "Foto",

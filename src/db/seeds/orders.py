@@ -8,6 +8,7 @@ from models import (
     EstadoEncomiendaEnum,
     EstadoPagoEnum,
     EstadoPedido,
+    EstadoPedidoEnum,
     MetodoPagoEnum,
     Pago,
     Pedido,
@@ -47,34 +48,34 @@ def create_orders(db):
         db.add_all([qr1, qr2, qr3])
         db.commit()
 
-        # Pedido abierto
+        # Pedido iniciado
         pedido1 = Pedido(
             id_local=1,
             id_mesa=3,
             id_usuario=2,
             id_qr=qr1.id,
             creado_por=4,
-            estado="iniciado",
+            estado=EstadoPedidoEnum.INICIADO,
             total=14000,
         )
-        # Pedido en preparacion
+        # Pedido en proceso
         pedido2 = Pedido(
             id_local=1,
             id_mesa=4,
             id_usuario=3,
             id_qr=qr2.id,
             creado_por=4,
-            estado="en_preparacion",
+            estado=EstadoPedidoEnum.EN_PROCESO,
             total=25300,
         )
-        # Pedido cerrado (historico)
+        # Pedido completado (histórico)
         pedido3 = Pedido(
             id_local=2,
             id_mesa=7,
             id_usuario=2,
             id_qr=qr3.id,
             creado_por=4,
-            estado="cerrado",
+            estado=EstadoPedidoEnum.COMPLETADO,
             total=18500,
             creado_el=datetime.now() - timedelta(days=1),
         )
@@ -146,25 +147,35 @@ def create_orders(db):
         )
         db.commit()
 
-        # Estados de pedido
+        # Estados de pedido (historial de cambios)
         db.add_all(
             [
-                EstadoPedido(id_pedido=pedido1.id, estado="iniciado", creado_por=4),
+                EstadoPedido(
+                    id_pedido=pedido1.id,
+                    estado=EstadoPedidoEnum.INICIADO,
+                    creado_por=4,
+                ),
                 EstadoPedido(
                     id_pedido=pedido2.id,
-                    estado="iniciado",
+                    estado=EstadoPedidoEnum.INICIADO,
                     creado_por=4,
                     creado_el=datetime.now() - timedelta(minutes=30),
                 ),
                 EstadoPedido(
                     id_pedido=pedido2.id,
-                    estado="en_preparacion",
+                    estado=EstadoPedidoEnum.RECEPCION,
+                    creado_por=5,
+                    creado_el=datetime.now() - timedelta(minutes=20),
+                ),
+                EstadoPedido(
+                    id_pedido=pedido2.id,
+                    estado=EstadoPedidoEnum.EN_PROCESO,
                     creado_por=5,
                     creado_el=datetime.now() - timedelta(minutes=15),
                 ),
                 EstadoPedido(
                     id_pedido=pedido3.id,
-                    estado="cerrado",
+                    estado=EstadoPedidoEnum.COMPLETADO,
                     creado_por=4,
                     creado_el=datetime.now() - timedelta(days=1),
                 ),

@@ -49,5 +49,9 @@ ruff = "^0.14.8"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.alembic]
+script_location = "alembic"
+prepend_sys_path = ["."]
+
 [tool.poetry.urls]
 repository = "https://github.com/Proyecto-SDS/back-RestoMap"

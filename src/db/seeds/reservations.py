@@ -1,7 +1,7 @@
 import logging
 from datetime import date, time, timedelta
 
-from models import EstadoReservaEnum, EstadoReservaMesaEnum, Reserva, ReservaMesa
+from models import EstadoReservaEnum, Reserva, ReservaMesa
 
 logger = logging.getLogger(__name__)
 
@@ -29,23 +29,20 @@ def create_reservations(db):
         db.add_all([reserva1, reserva2])
         db.commit()
 
-        # Asignar mesas a reservas
+        # Asignar mesas a reservas (sin campo prioridad, se calcula dinámicamente)
         db.add_all(
             [
                 ReservaMesa(
                     id_reserva=reserva1.id,
                     id_mesa=1,
-                    prioridad=EstadoReservaMesaEnum.ALTA,
                 ),
                 ReservaMesa(
                     id_reserva=reserva1.id,
                     id_mesa=2,
-                    prioridad=EstadoReservaMesaEnum.MEDIA,
                 ),
                 ReservaMesa(
                     id_reserva=reserva2.id,
                     id_mesa=6,
-                    prioridad=EstadoReservaMesaEnum.ALTA,
                 ),
             ]
         )

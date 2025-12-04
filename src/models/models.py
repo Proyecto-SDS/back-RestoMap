@@ -4,6 +4,10 @@ MODELOS SQLALCHEMY COMPLETOS + ENUMS
 Sistema de Gestion de Locales, Pedidos y Reservas
 Compatible con: Flask, SQLAlchemy, PostgreSQL, Pydantic v2
 ========================================
+CAMBIOS FINALES:
+- Eliminado prioridad de ReservaMesa (se calcula dinámicamente)
+- Prioridad calculada por fecha-hora de reserva (backend)
+========================================
 """
 
 from datetime import date, datetime, time
@@ -29,13 +33,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 # ============================================
-# CONFIGURACIoN BASE
+# CONFIGURACIÓN BASE
 # ============================================
-# Importar Base desde database.py (no crear una nueva)
 from database import Base
 
 # ============================================
-# ENUMS - SECCIoN 1: PAGO
+# ENUMS - SECCIÓN 1: PAGO
 # ============================================
 
 
@@ -79,37 +82,54 @@ class EstadoPagoEnum(str, PyEnum):
 
 
 # ============================================
-# ENUMS - SECCIoN 2: PEDIDO
+# ENUMS - SECCIÓN 2: PEDIDO
 # ============================================
 
 
 class EstadoPedidoEnum(str, PyEnum):
-    """Estados de un pedido"""
+    """Estados de un pedido - ACTUALIZADO según auditoría"""
 
-    ABIERTO = "abierto"
-    EN_PREPARACION = "en_preparacion"
-    SERVIDO = "servido"
-    CERRADO = "cerrado"
+    INICIADO = "iniciado"  # Pedido creado desde QR
+    RECEPCION = "recepcion"  # Pedido recibido en cocina
+    EN_PROCESO = "en_proceso"  # Se está preparando
+    TERMINADO = "terminado"  # Listo para servir
+    COMPLETADO = "completado"  # Pagado y cerrado
     CANCELADO = "cancelado"
 
     @classmethod
     def choices(cls) -> list[tuple]:
         return [
-            (cls.ABIERTO, "Abierto"),
-            (cls.EN_PREPARACION, "En Preparacion"),
-            (cls.SERVIDO, "Servido"),
-            (cls.CERRADO, "Cerrado"),
+            (cls.INICIADO, "Iniciado"),
+            (cls.RECEPCION, "Recepción"),
+            (cls.EN_PROCESO, "En Proceso"),
+            (cls.TERMINADO, "Terminado"),
+            (cls.COMPLETADO, "Completado"),
             (cls.CANCELADO, "Cancelado"),
         ]
 
     @classmethod
     def is_activo(cls, estado: "EstadoPedidoEnum") -> bool:
         """Verifica si el pedido sigue activo"""
-        return estado not in [cls.CERRADO, cls.CANCELADO]
+        return estado not in [cls.COMPLETADO, cls.CANCELADO]
+
+    @classmethod
+    def flujo_valido(
+        cls, estado_actual: "EstadoPedidoEnum", estado_nuevo: "EstadoPedidoEnum"
+    ) -> bool:
+        """Valida transiciones permitidas en el flujo de pedidos"""
+        transiciones = {
+            cls.INICIADO: [cls.RECEPCION, cls.CANCELADO],
+            cls.RECEPCION: [cls.EN_PROCESO, cls.CANCELADO],
+            cls.EN_PROCESO: [cls.TERMINADO, cls.CANCELADO],
+            cls.TERMINADO: [cls.COMPLETADO],
+            cls.COMPLETADO: [],
+            cls.CANCELADO: [],
+        }
+        return estado_nuevo in transiciones.get(estado_actual, [])
 
 
 # ============================================
-# ENUMS - SECCIoN 3: MESA Y RESERVA
+# ENUMS - SECCIÓN 3: MESA Y RESERVA
 # ============================================
 
 
@@ -142,6 +162,7 @@ class EstadoReservaEnum(str, PyEnum):
     PENDIENTE = "pendiente"
     CONFIRMADA = "confirmada"
     RECHAZADA = "rechazada"
+    EXPIRADA = "expirada"  # Para reservas que expiraron
 
     @classmethod
     def choices(cls) -> list[tuple]:
@@ -149,27 +170,12 @@ class EstadoReservaEnum(str, PyEnum):
             (cls.PENDIENTE, "Pendiente"),
             (cls.CONFIRMADA, "Confirmada"),
             (cls.RECHAZADA, "Rechazada"),
-        ]
-
-
-class EstadoReservaMesaEnum(str, PyEnum):
-    """Prioridad de una mesa en una reserva"""
-
-    ALTA = "alta"
-    MEDIA = "media"
-    BAJA = "baja"
-
-    @classmethod
-    def choices(cls) -> list[tuple]:
-        return [
-            (cls.ALTA, "Alta"),
-            (cls.MEDIA, "Media"),
-            (cls.BAJA, "Baja"),
+            (cls.EXPIRADA, "Expirada"),
         ]
 
 
 # ============================================
-# ENUMS - SECCIoN 4: PRODUCTO Y ENCOMIENDA
+# ENUMS - SECCIÓN 4: PRODUCTO Y ENCOMIENDA
 # ============================================
 
 
@@ -207,7 +213,7 @@ class EstadoEncomiendaEnum(str, PyEnum):
     def choices(cls) -> list[tuple]:
         return [
             (cls.PENDIENTE, "Pendiente"),
-            (cls.EN_PREPARACION, "En Preparacion"),
+            (cls.EN_PREPARACION, "En Preparación"),
             (cls.LISTA, "Lista"),
             (cls.ENTREGADA, "Entregada"),
             (cls.CANCELADA, "Cancelada"),
@@ -215,7 +221,7 @@ class EstadoEncomiendaEnum(str, PyEnum):
 
 
 # ============================================
-# ENUMS - SECCIoN 5: ADICIONALES
+# ENUMS - SECCIÓN 5: ADICIONALES
 # ============================================
 
 
@@ -270,22 +276,61 @@ def obtener_etiqueta(enum_class, valor: str) -> str:
     return valor
 
 
+def obtener_prioridad_reserva(
+    fecha_reserva: date | Column[date], hora_reserva: time | Column[time]
+) -> str:
+    """
+    Calcula DINÁMICAMENTE la prioridad de una reserva según cercanía a la hora actual.
+
+    - ALTA: Dentro de 2 horas
+    - MEDIA: Dentro de 24 horas
+    - BAJA: Más de 24 horas
+
+    Esta es la forma correcta de hacerlo (no como campo en BD)
+    """
+    from datetime import datetime
+
+    ahora = datetime.now()
+    reserva_datetime = datetime.combine(fecha_reserva, hora_reserva)  # type: ignore
+    diferencia_horas = (reserva_datetime - ahora).total_seconds() / 3600
+
+    if diferencia_horas <= 2:
+        return "alta"
+    elif diferencia_horas <= 24:
+        return "media"
+    else:
+        return "baja"
+
+
 def obtener_colores_estado(enum_value) -> dict[str, str]:
-    """Retorna color y icono para mostrar estados en frontend"""
+    """Retorna color e ícono para mostrar estados en frontend"""
     color_map = {
         # Pedidos
-        EstadoPedidoEnum.ABIERTO: {"color": "blue", "icono": "🟦", "label": "Abierto"},
-        EstadoPedidoEnum.EN_PREPARACION: {
+        EstadoPedidoEnum.INICIADO: {
+            "color": "blue",
+            "icono": "🟦",
+            "label": "Iniciado",
+        },
+        EstadoPedidoEnum.RECEPCION: {
+            "color": "cyan",
+            "icono": "",
+            "label": "Recepción",
+        },
+        EstadoPedidoEnum.EN_PROCESO: {
             "color": "orange",
             "icono": "🟧",
-            "label": "Preparando",
+            "label": "En Proceso",
         },
-        EstadoPedidoEnum.SERVIDO: {
+        EstadoPedidoEnum.TERMINADO: {
             "color": "purple",
             "icono": "🟪",
-            "label": "Servido",
+            "label": "Terminado",
         },
-        EstadoPedidoEnum.CERRADO: {"color": "green", "icono": "🟩", "label": "Cerrado"},
+        EstadoPedidoEnum.COMPLETADO: {
+            "color": "green",
+            "icono": "🟩",
+            "label": "Completado",
+        },
         EstadoPedidoEnum.CANCELADO: {
             "color": "red",
             "icono": "🟥",
@@ -305,32 +350,28 @@ def obtener_colores_estado(enum_value) -> dict[str, str]:
         EstadoMesaEnum.OCUPADA: {"color": "orange", "icono": "", "label": "Ocupada"},
         EstadoMesaEnum.FUERA_DE_SERVICIO: {
             "color": "red",
-            "icono": "",
+            "icono": "⛔",
             "label": "Fuera de Servicio",
         },
     }
-
     return color_map.get(
         enum_value, {"color": "gray", "icono": "", "label": str(enum_value)}
     )
 
 
 def validar_transicion_estado(estado_actual, estado_nuevo, enum_class) -> bool:
-    """Valida si la transicion de estados es permitida"""
+    """
+    Valida si la transición de estados es permitida.
+
+    Para pedidos, delega al método flujo_valido() de EstadoPedidoEnum.
+    Para otros enums, usa lógica de transiciones definida aquí.
+    """
+    # Para pedidos, usar el método de la clase
+    if enum_class == EstadoPedidoEnum:
+        return EstadoPedidoEnum.flujo_valido(estado_actual, estado_nuevo)
+
+    # Para otros enums (mesas, etc.)
     transiciones_validas = {
-        EstadoPedidoEnum: {
-            EstadoPedidoEnum.ABIERTO: [
-                EstadoPedidoEnum.EN_PREPARACION,
-                EstadoPedidoEnum.CANCELADO,
-            ],
-            EstadoPedidoEnum.EN_PREPARACION: [
-                EstadoPedidoEnum.SERVIDO,
-                EstadoPedidoEnum.CANCELADO,
-            ],
-            EstadoPedidoEnum.SERVIDO: [EstadoPedidoEnum.CERRADO],
-            EstadoPedidoEnum.CERRADO: [],
-            EstadoPedidoEnum.CANCELADO: [],
-        },
         EstadoMesaEnum: {
             EstadoMesaEnum.DISPONIBLE: [
                 EstadoMesaEnum.RESERVADA,
@@ -347,7 +388,6 @@ def validar_transicion_estado(estado_actual, estado_nuevo, enum_class) -> bool:
 
     transiciones = transiciones_validas.get(enum_class, {})
     permitidas = transiciones.get(estado_actual, [])
-
     return estado_nuevo in permitidas
 
 
@@ -412,7 +452,7 @@ class Categoria(Base):
 
 
 # ============================================
-# UBICACIoN
+# UBICACIÓN
 # ============================================
 
 
@@ -433,7 +473,7 @@ class Direccion(Base):
 
 
 # ============================================
-# LOCALES Y CONFIGURACIoN
+# LOCALES Y CONFIGURACIÓN
 # ============================================
 
 
@@ -537,7 +577,7 @@ class Mesa(Base):
 
 
 # ============================================
-# USUARIOS Y AUTENTICACIoN
+# USUARIOS Y AUTENTICACIÓN
 # ============================================
 
 
@@ -670,7 +710,7 @@ class Redes(Base):
 
 
 # ============================================
-# CATaLOGO DE PRODUCTOS
+# CATÁLOGO DE PRODUCTOS
 # ============================================
 
 
@@ -808,6 +848,11 @@ class Reserva(Base):
         cascade="all, delete-orphan",
     )
 
+    @property
+    def prioridad(self) -> str:
+        """Propiedad que calcula la prioridad dinámicamente"""
+        return obtener_prioridad_reserva(self.fecha_reserva, self.hora_reserva)
+
 
 class ReservaMesa(Base):
     __tablename__ = "reserva_mesa"
@@ -822,9 +867,6 @@ class ReservaMesa(Base):
     id_mesa = Column(
         Integer, ForeignKey("mesa.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    prioridad = Column(
-        Enum(EstadoReservaMesaEnum, name="estado_reserva_mesa_enum"), nullable=False
-    )
 
     __table_args__ = (
         UniqueConstraint("id_reserva", "id_mesa", name="uq_reserva_mesa"),
@@ -835,7 +877,46 @@ class ReservaMesa(Base):
 
 
 # ============================================
-# PEDIDOS
+# QR DINÁMICO
+# ============================================
+
+
+class QRDinamico(Base):
+    __tablename__ = "qr_dinamico"
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_mesa = Column(
+        Integer, ForeignKey("mesa.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    id_pedido = Column(
+        Integer, ForeignKey("pedido.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    id_reserva = Column(
+        Integer, ForeignKey("reserva.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    id_usuario = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    codigo = Column(String(255), nullable=False, unique=True, index=True)
+    expiracion = Column(DateTime(timezone=True), nullable=False)
+    activo = Column(Boolean, default=True, nullable=False, index=True)
+    creado_el = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    mesa = relationship("Mesa", back_populates="qr_dinamicos", lazy="joined")
+    pedido = relationship(
+        "Pedido", foreign_keys=[id_pedido], overlaps="qr,qr_dinamicos", lazy="joined"
+    )
+    reserva = relationship("Reserva", back_populates="qr_dinamicos", lazy="joined")
+    usuario = relationship("Usuario", back_populates="qr_dinamicos", lazy="joined")
+
+
+# ============================================
+# PEDIDOS Y ÓRDENES
 # ============================================
 
 
@@ -870,7 +951,7 @@ class Pedido(Base):
     estado = Column(
         Enum(EstadoPedidoEnum, name="estado_pedido_enum"),
         nullable=False,
-        default="iniciado",
+        default=EstadoPedidoEnum.INICIADO,
         index=True,
     )
     total = Column(Integer, nullable=False, default=0)
@@ -882,7 +963,10 @@ class Pedido(Base):
     local = relationship("Local", back_populates="pedidos", lazy="joined")
     mesa = relationship("Mesa", lazy="joined")
     usuario = relationship(
-        "Usuario", back_populates="pedidos", lazy="joined", foreign_keys=[id_usuario]
+        "Usuario",
+        back_populates="pedidos",
+        lazy="joined",
+        foreign_keys=[id_usuario],
     )
     creador = relationship(
         "Usuario",
@@ -969,7 +1053,9 @@ class EstadoPedido(Base):
         Integer, ForeignKey("pedido.id", ondelete="CASCADE"), nullable=False, index=True
     )
     estado = Column(
-        Enum(EstadoPedidoEnum, name="estado_pedido_enum"), nullable=False, index=True
+        Enum(EstadoPedidoEnum, name="estado_pedido_enum"),
+        nullable=False,
+        index=True,
     )
     creado_por = Column(
         Integer,
@@ -989,45 +1075,6 @@ class EstadoPedido(Base):
         lazy="joined",
         foreign_keys=[creado_por],
     )
-
-
-# ============================================
-# QR DINaMICO
-# ============================================
-
-
-class QRDinamico(Base):
-    __tablename__ = "qr_dinamico"
-
-    id = Column(Integer, primary_key=True, index=True)
-    id_mesa = Column(
-        Integer, ForeignKey("mesa.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    id_pedido = Column(
-        Integer, ForeignKey("pedido.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    id_reserva = Column(
-        Integer, ForeignKey("reserva.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    id_usuario = Column(
-        Integer,
-        ForeignKey("usuario.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    codigo = Column(String(255), nullable=False, unique=True, index=True)
-    expiracion = Column(DateTime(timezone=True), nullable=False)
-    activo = Column(Boolean, default=True, nullable=False, index=True)
-    creado_el = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    mesa = relationship("Mesa", back_populates="qr_dinamicos", lazy="joined")
-    pedido = relationship(
-        "Pedido", foreign_keys=[id_pedido], overlaps="qr,qr_dinamicos", lazy="joined"
-    )
-    reserva = relationship("Reserva", back_populates="qr_dinamicos", lazy="joined")
-    usuario = relationship("Usuario", back_populates="qr_dinamicos", lazy="joined")
 
 
 # ============================================
@@ -1135,7 +1182,7 @@ class UsuarioSchema(BaseModel):
     id: int | None = None
     nombre: str
     correo: EmailStr
-    telefono: str
+    telefono: str | None = None
     id_rol: int | None = None
 
     class Config:
@@ -1174,7 +1221,7 @@ class PedidoSchema(BaseModel):
     id_usuario: int
     id_qr: int
     creado_por: int
-    estado: str
+    estado: EstadoPedidoEnum
     total: int
 
     class Config:
@@ -1229,6 +1276,7 @@ class ReservaSchema(BaseModel):
     estado: EstadoReservaEnum
     creado_el: datetime | None = None
     expirado_el: datetime | None = None
+    prioridad: str | None = None  # Calculada dinámicamente
 
     class Config:
         from_attributes = True
@@ -1265,6 +1313,18 @@ class EncomiendaSchema(BaseModel):
     id_pedido: int
     estado: EstadoEncomiendaEnum
     creado_el: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class EstadoPedidoSchema(BaseModel):
+    id: int | None = None
+    id_pedido: int
+    estado: EstadoPedidoEnum
+    creado_por: int
+    creado_el: datetime | None = None
+    nota: str | None = None
 
     class Config:
         from_attributes = True

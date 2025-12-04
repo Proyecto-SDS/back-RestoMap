@@ -18,7 +18,7 @@ from models import (
     Reserva,
     ReservaMesa,
 )
-from models.models import EstadoReservaEnum, EstadoReservaMesaEnum
+from models.models import EstadoReservaEnum
 from services.qr_service import crear_qr_reserva, generar_qr_imagen
 from utils.jwt_helper import requerir_auth
 
@@ -173,11 +173,10 @@ def crear_reserva(user_id, _user_rol):
         db_session.add(nueva_reserva)
         db_session.flush()  # Para obtener el ID
 
-        # Crear relacion reserva-mesa
+        # Crear relacion reserva-mesa (sin prioridad, se calcula dinámicamente)
         reserva_mesa = ReservaMesa(
             id_reserva=nueva_reserva.id,
             id_mesa=mesa_id,
-            prioridad=EstadoReservaMesaEnum.ALTA,
         )
 
         db_session.add(reserva_mesa)
