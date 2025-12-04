@@ -184,11 +184,8 @@ def register():
             select(Rol).where(Rol.nombre == "usuario")
         ).scalar_one_or_none()
 
-        if not rol_usuario:
-            # Fallback: usar id 3
-            rol_id = 3
-        else:
-            rol_id = rol_usuario.id
+        # Fallback: usar id 3 si no existe rol_usuario
+        rol_id = 3 if not rol_usuario else rol_usuario.id
 
         # Crear nuevo usuario
         nuevo_usuario = Usuario(
