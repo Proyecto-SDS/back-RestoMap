@@ -1,32 +1,33 @@
-# Backend - Sistema de Gestion de Locales
+# Backend - Sistema de Gestión de Locales RestoMap
 
-Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestion de locales, pedidos y reservas.
+Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de locales, pedidos y reservas.
 
-## Tabla de Contenido
+🚀 **Optimizado para Docker y Google Cloud Platform (GCP Cloud Run)**
+
+## 📋 Tabla de Contenido
 
 - [Requisitos](#requisitos)
+- [Inicio Rápido con Docker](#inicio-rápido-con-docker)
 - [Estructura del Proyecto](#estructura-del-proyecto)
-- [Configuracion](#configuracion)
-- [Uso con Docker](#uso-con-docker)
+- [Configuración](#configuración)
 - [Migraciones de Base de Datos](#migraciones-de-base-de-datos)
+- [Deployment](#deployment)
 - [API Endpoints](#api-endpoints)
 
 ## Requisitos
 
-### Para Producción (Docker)
+### Para Docker (Recomendado para Producción y Desarrollo)
 
-- Docker Desktop
-- Docker Compose
+- **Docker Desktop** 24.0+
+- **Docker Compose** 2.20+
 
-**No se requiere instalacion local de Python ni PostgreSQL** - todo se ejecuta en contenedores Docker.
+**✅ No se requiere instalación local de Python ni PostgreSQL** - todo se ejecuta en contenedores.
 
-### Para Desarrollo Local (Opcional)
-
-Si prefieres desarrollar localmente sin Docker:
+### Para Desarrollo Local sin Docker (Opcional)
 
 - **Python 3.12.10**
-- **Poetry** (gestor de dependencias)
-- **PostgreSQL 18** (opcional, puedes usar solo la BD en Docker)
+- **Poetry 1.7+** (gestor de dependencias)
+- **PostgreSQL 18** (opcional, puede usar solo la BD en Docker)
 
 #### Instalación de Poetry
 
@@ -39,6 +40,36 @@ curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 Ver la [Guía de Poetry](.guias/POETRY_GUIDE.md) para más información.
+
+---
+
+## 🚀 Inicio Rápido con Docker
+
+```bash
+# 1. Clonar repositorio
+git clone https://github.com/Proyecto-SDS/back-RestoMap.git
+cd back-RestoMap/backend
+
+# 2. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus valores
+
+# 3. Iniciar base de datos
+docker-compose up -d db
+
+# 4. Inicializar base de datos (migraciones + seeds)
+docker-compose --profile init up init-db
+
+# 5. Iniciar backend
+docker-compose up -d backend
+
+# 6. Verificar funcionamiento
+curl http://localhost:5000/health
+```
+
+**📖 Para deployment en GCP Cloud Run, ver [DEPLOYMENT.md](./DEPLOYMENT.md)**
+
+---
 
 ## Desarrollo Local con Poetry
 

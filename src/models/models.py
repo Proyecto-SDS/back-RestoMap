@@ -302,63 +302,6 @@ def obtener_prioridad_reserva(
         return "baja"
 
 
-def obtener_colores_estado(enum_value) -> dict[str, str]:
-    """Retorna color e ícono para mostrar estados en frontend"""
-    color_map = {
-        # Pedidos
-        EstadoPedidoEnum.INICIADO: {
-            "color": "blue",
-            "icono": "🟦",
-            "label": "Iniciado",
-        },
-        EstadoPedidoEnum.RECEPCION: {
-            "color": "cyan",
-            "icono": "",
-            "label": "Recepción",
-        },
-        EstadoPedidoEnum.EN_PROCESO: {
-            "color": "orange",
-            "icono": "🟧",
-            "label": "En Proceso",
-        },
-        EstadoPedidoEnum.TERMINADO: {
-            "color": "purple",
-            "icono": "🟪",
-            "label": "Terminado",
-        },
-        EstadoPedidoEnum.COMPLETADO: {
-            "color": "green",
-            "icono": "🟩",
-            "label": "Completado",
-        },
-        EstadoPedidoEnum.CANCELADO: {
-            "color": "red",
-            "icono": "🟥",
-            "label": "Cancelado",
-        },
-        # Mesas
-        EstadoMesaEnum.DISPONIBLE: {
-            "color": "green",
-            "icono": "",
-            "label": "Disponible",
-        },
-        EstadoMesaEnum.RESERVADA: {
-            "color": "yellow",
-            "icono": "",
-            "label": "Reservada",
-        },
-        EstadoMesaEnum.OCUPADA: {"color": "orange", "icono": "", "label": "Ocupada"},
-        EstadoMesaEnum.FUERA_DE_SERVICIO: {
-            "color": "red",
-            "icono": "⛔",
-            "label": "Fuera de Servicio",
-        },
-    }
-    return color_map.get(
-        enum_value, {"color": "gray", "icono": "", "label": str(enum_value)}
-    )
-
-
 def validar_transicion_estado(estado_actual, estado_nuevo, enum_class) -> bool:
     """
     Valida si la transición de estados es permitida.

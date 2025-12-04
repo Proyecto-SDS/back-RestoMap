@@ -49,9 +49,47 @@ ruff = "^0.14.8"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+# ============================================
+# CONFIGURACIÓN DE ALEMBIC (PEP 621)
+# ============================================
 [tool.alembic]
+# Ruta a los scripts de migración
 script_location = "alembic"
-prepend_sys_path = ["."]
+
+# Rutas adicionales a agregar a sys.path
+prepend_sys_path = [
+    ".",
+    "src"
+]
+
+# Plantilla para nombres de archivos de migración
+# Formato: AAAA_MM_DD_HHMM-{rev}_{slug}
+file_template = "%%%(year)d_%%%(month).2d_%%%(day).2d_%%%(hour).2d%%%(minute).2d-%%%(rev)s_%%%(slug)s"
+
+# Zona horaria para timestamps (requiere python>=3.9)
+timezone = "America/Santiago"
+
+# Longitud máxima del campo "slug"
+truncate_slug_length = 40
+
+# Ejecutar environment durante 'revision' command
+revision_environment = false
+
+# Permitir archivos .pyc/.pyo sin .py
+sourceless = false
+
+# Búsqueda recursiva en directorios de versiones
+recursive_version_locations = false
+
+# Encoding de salida
+output_encoding = "utf-8"
+
+# Post-write hooks para formatear código generado
+[[tool.alembic.post_write_hooks]]
+name = "ruff"
+type = "console_scripts"
+entrypoint = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"
 
 [tool.poetry.urls]
 repository = "https://github.com/Proyecto-SDS/back-RestoMap"

@@ -66,7 +66,6 @@ from .models import (
     # ============ Modelos - Usuarios ============
     Usuario,
     UsuarioSchema,
-    obtener_colores_estado,
     # ============ Funciones Auxiliares ============
     obtener_etiqueta,
     validar_transicion_estado,
@@ -135,7 +134,6 @@ __all__ = [
     # Modelos - Usuarios
     "Usuario",
     "UsuarioSchema",
-    "obtener_colores_estado",
     # Funciones Auxiliares
     "obtener_etiqueta",
     "validar_transicion_estado",
