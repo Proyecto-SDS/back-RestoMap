@@ -82,8 +82,8 @@ def listar_empleados(user_id, user_rol, id_local):
                     "nombre": emp.nombre,
                     "correo": emp.correo,
                     "telefono": emp.telefono,
-                    "rol": emp.rol,
-                    "estado": "activo" if emp.activo else "inactivo",
+                    "rol": emp.rol.nombre if emp.rol else None,
+                    "estado": "activo",
                     "creado_el": emp.creado_el.isoformat() if emp.creado_el else None,
                 }
             )
@@ -136,7 +136,6 @@ def crear_empleado(user_id, user_rol, id_local):
             telefono=data.telefono,
             contrasena=contrasena_hash,
             rol=data.rol,
-            activo=True,
         )
         db.add(nuevo_empleado)
         db.commit()
@@ -219,37 +218,12 @@ def actualizar_empleado(empleado_id, user_id, user_rol, id_local):
 @requerir_empleado
 @requerir_roles_empresa("gerente")
 def cambiar_estado_empleado(empleado_id, user_id, user_rol, id_local):
-    """Activar o desactivar un empleado"""
-    try:
-        data = EmpleadoEstadoSchema(**request.get_json())
-    except ValidationError as e:
-        return jsonify({"error": "Datos inválidos", "details": e.errors()}), 400
-
-    db = get_session()
-    try:
-        stmt = select(Usuario).where(
-            Usuario.id == empleado_id, Usuario.id_local == id_local
-        )
-        empleado = db.execute(stmt).scalar_one_or_none()
-
-        if not empleado:
-            return jsonify({"error": "Empleado no encontrado"}), 404
-
-        empleado.activo = data.estado == "activo"
-        db.commit()
-
-        return jsonify(
-            {
-                "message": f"Empleado {'activado' if empleado.activo else 'desactivado'}",
-                "empleado": {
-                    "id": empleado.id,
-                    "nombre": empleado.nombre,
-                    "estado": "activo" if empleado.activo else "inactivo",
-                },
-            }
-        ), 200
-    finally:
-        db.close()
+    """Endpoint legacy - los empleados no tienen estado, se eliminan"""
+    return jsonify(
+        {
+            "message": "Los empleados no tienen estado. Use DELETE para eliminar.",
+        }
+    ), 400
 
 
 @empleados_bp.route("/<int:empleado_id>", methods=["DELETE"])

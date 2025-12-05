@@ -14,7 +14,7 @@ def requerir_empleado(f):
     """
     Decorator para verificar que el usuario es empleado de un local.
     Debe usarse DESPUES de @requerir_auth
-    
+
     Valida que:
     - El usuario tiene id_local asignado
     - El usuario tiene un rol de empleado
@@ -26,7 +26,9 @@ def requerir_empleado(f):
         user_rol = kwargs.get("user_rol")
 
         if id_local is None:
-            return jsonify({"error": "Acceso denegado. Solo empleados pueden acceder"}), 403
+            return jsonify(
+                {"error": "Acceso denegado. Solo empleados pueden acceder"}
+            ), 403
 
         if user_rol is None:
             return jsonify({"error": "Usuario sin rol asignado"}), 403
@@ -40,10 +42,10 @@ def requerir_roles_empresa(*roles_permitidos):
     """
     Decorator para verificar roles de empresa.
     Debe usarse DESPUES de @requerir_auth y @requerir_empleado
-    
+
     Args:
         *roles_permitidos: Roles que pueden acceder (ej: 'gerente', 'mesero', 'cocinero', 'bartender')
-    
+
     Usage:
         @empresa_bp.route('/empleados')
         @requerir_auth
@@ -75,10 +77,11 @@ def requerir_roles_empresa(*roles_permitidos):
 
 
 # Importar sub-blueprints
+from routes.empresa.empleados import empleados_bp
 from routes.empresa.mesas import mesas_bp
 from routes.empresa.pedidos import pedidos_bp
-from routes.empresa.empleados import empleados_bp
 from routes.empresa.productos import productos_bp
+from routes.empresa.reservas import reservas_bp
 from routes.empresa.stats import stats_bp
 
 # Registrar sub-blueprints
@@ -86,4 +89,5 @@ empresa_bp.register_blueprint(mesas_bp)
 empresa_bp.register_blueprint(pedidos_bp)
 empresa_bp.register_blueprint(empleados_bp)
 empresa_bp.register_blueprint(productos_bp)
+empresa_bp.register_blueprint(reservas_bp)
 empresa_bp.register_blueprint(stats_bp)

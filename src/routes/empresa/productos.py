@@ -25,6 +25,20 @@ class ProductoEstadoSchema(BaseModel):
     estado: EstadoProductoEnum
 
 
+class ProductoCreateSchema(BaseModel):
+    nombre: str
+    descripcion: str | None = None
+    precio: int
+    categoria_id: int | None = None
+
+
+class ProductoUpdateSchema(BaseModel):
+    nombre: str | None = None
+    descripcion: str | None = None
+    precio: int | None = None
+    categoria_id: int | None = None
+
+
 # ============================================
 # ENDPOINTS
 # ============================================
@@ -117,5 +131,120 @@ def cambiar_estado_producto(producto_id, user_id, user_rol, id_local):
                 },
             }
         ), 200
+    finally:
+        db.close()
+
+
+@productos_bp.route("/", methods=["POST"])
+@requerir_auth
+@requerir_empleado
+@requerir_roles_empresa("gerente")
+def crear_producto(user_id, user_rol, id_local):
+    """Crear un nuevo producto"""
+    try:
+        data = ProductoCreateSchema(**request.get_json())
+    except ValidationError as e:
+        return jsonify({"error": "Datos invalidos", "details": e.errors()}), 400
+
+    db = get_session()
+    try:
+        nuevo_producto = Producto(
+            id_local=id_local,
+            nombre=data.nombre,
+            descripcion=data.descripcion,
+            precio=data.precio,
+            id_categoria=data.categoria_id,
+            estado=EstadoProductoEnum.DISPONIBLE,
+        )
+        db.add(nuevo_producto)
+        db.commit()
+        db.refresh(nuevo_producto)
+
+        return jsonify(
+            {
+                "message": "Producto creado exitosamente",
+                "producto": {
+                    "id": nuevo_producto.id,
+                    "nombre": nuevo_producto.nombre,
+                    "descripcion": nuevo_producto.descripcion,
+                    "precio": nuevo_producto.precio,
+                    "estado": nuevo_producto.estado.value,
+                    "categoria_id": nuevo_producto.id_categoria,
+                },
+            }
+        ), 201
+    finally:
+        db.close()
+
+
+@productos_bp.route("/<int:producto_id>", methods=["PUT"])
+@requerir_auth
+@requerir_empleado
+@requerir_roles_empresa("gerente")
+def actualizar_producto(producto_id, user_id, user_rol, id_local):
+    """Actualizar un producto"""
+    try:
+        data = ProductoUpdateSchema(**request.get_json())
+    except ValidationError as e:
+        return jsonify({"error": "Datos invalidos", "details": e.errors()}), 400
+
+    db = get_session()
+    try:
+        stmt = select(Producto).where(
+            Producto.id == producto_id, Producto.id_local == id_local
+        )
+        producto = db.execute(stmt).scalar_one_or_none()
+
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+
+        if data.nombre is not None:
+            producto.nombre = data.nombre
+        if data.descripcion is not None:
+            producto.descripcion = data.descripcion
+        if data.precio is not None:
+            producto.precio = data.precio
+        if data.categoria_id is not None:
+            producto.id_categoria = data.categoria_id
+
+        db.commit()
+
+        return jsonify(
+            {
+                "message": "Producto actualizado",
+                "producto": {
+                    "id": producto.id,
+                    "nombre": producto.nombre,
+                    "descripcion": producto.descripcion,
+                    "precio": producto.precio,
+                    "estado": producto.estado.value,
+                    "categoria_id": producto.id_categoria,
+                },
+            }
+        ), 200
+    finally:
+        db.close()
+
+
+@productos_bp.route("/<int:producto_id>", methods=["DELETE"])
+@requerir_auth
+@requerir_empleado
+@requerir_roles_empresa("gerente")
+def eliminar_producto(producto_id, user_id, user_rol, id_local):
+    """Eliminar un producto"""
+    db = get_session()
+    try:
+        stmt = select(Producto).where(
+            Producto.id == producto_id, Producto.id_local == id_local
+        )
+        producto = db.execute(stmt).scalar_one_or_none()
+
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+
+        db.delete(producto)
+        db.commit()
+
+        return jsonify({"message": "Producto eliminado exitosamente"}), 200
     finally:
         db.close()

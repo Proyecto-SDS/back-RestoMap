@@ -90,6 +90,7 @@ ignore = [
     "C901",    # Complex function
     "PLC0415", # Import outside top-level
     "ARG001",  # Too many arguments
+    "E402",    # Module level import not at top of file
 ]
 
 fixable = ["ALL"]
