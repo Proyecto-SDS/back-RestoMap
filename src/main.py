@@ -3,20 +3,16 @@ Punto de entrada principal de la aplicacion Flask
 Backend - Sistema de Gestion de Locales
 """
 
-import logging
-
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from config import Config
+from config import Config, get_logger, setup_logging
 from database import db_session
 from middleware import register_middleware
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Configurar logging centralizado
+setup_logging()
+logger = get_logger(__name__)
 
 
 def create_app(config: Config | None = None) -> Flask:

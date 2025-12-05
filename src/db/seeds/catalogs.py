@@ -1,8 +1,7 @@
-import logging
-
+from config import get_logger
 from models import Categoria, Comuna, TipoFoto, TipoLocal, TipoRed
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_catalogs(db):

@@ -537,7 +537,7 @@ class Usuario(Base):
     nombre = Column(String(100), nullable=False)
     correo = Column(String(100), unique=True, nullable=False, index=True)
     contrasena = Column(String(200), nullable=False)
-    telefono = Column(String(32), nullable=True)
+    telefono = Column(String(32), nullable=False)
     creado_el = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

@@ -4,7 +4,6 @@ Puebla la base de datos con datos de referencia y ejemplos de testing
 Version optimizada para Cloud Run y Docker
 """
 
-import logging
 import sys
 import traceback
 from pathlib import Path
@@ -20,11 +19,11 @@ src_dir = current_dir.parent
 if str(src_dir) not in sys.path:
     sys.path.append(str(src_dir))
 
-# Configuracion de Logging (para que se vea bien en Google Cloud)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Configurar logging usando el sistema centralizado
+from config import get_logger, setup_logging  # noqa: E402
+
+setup_logging()
+logger = get_logger(__name__)
 
 try:
     # --- 2. IMPORTACIONES ---

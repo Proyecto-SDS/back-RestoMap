@@ -1,6 +1,6 @@
-import logging
 from datetime import datetime, timedelta
 
+from config import get_logger
 from models import (
     Cuenta,
     Encomienda,
@@ -14,7 +14,7 @@ from models import (
     Pedido,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_orders(db):

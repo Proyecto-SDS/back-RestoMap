@@ -58,7 +58,7 @@ cp .env.example .env
 docker-compose up -d db
 
 # 4. Inicializar base de datos (migraciones + seeds)
-docker-compose --profile init up init-db
+docker-compose --profile init run --rm init-db
 
 # 5. Iniciar backend
 docker-compose up -d backend
@@ -134,6 +134,12 @@ POSTGRES_DB=tu_bd
 # Configuracion General
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 # Lista separada por comas
 ENV=development # 'production' o 'development'
+
+# Logs (importante para Docker)
+# text = logs legibles con colores (desarrollo)
+# json = formato JSON estructurado (GCP/produccion)
+# auto = detecta automaticamente (JSON en Docker/GCP)
+LOG_FORMAT=text
 ```
 
 ## Produccion con Docker
@@ -315,51 +321,51 @@ docker-compose up backend
 
 ### Explicacion de Servicios
 
-El `docker-compose.yml` tiene 4 servicios, pero solo 2 corren por defecto:
+El `docker-compose.yml` tiene 4 servicios:
 
-| Servicio  | ¿Se levanta automaticamente? | Proposito                         |
-| --------- | ---------------------------- | --------------------------------- |
-| `db`      | Si                           | PostgreSQL (siempre activo)       |
-| `backend` | Si                           | API Flask (siempre activo)        |
-| `app`     | NO (profile: tools)          | Comandos manuales de Alembic      |
-| `init-db` | NO (profile: init)           | Inicializar BD (solo primera vez) |
+| Servicio   | Puerto | ¿Se levanta automáticamente? | Propósito                           |
+| ---------- | ------ | ---------------------------- | ----------------------------------- |
+| `db`       | 5432   | Sí                           | PostgreSQL 16 Alpine                |
+| `backend`  | 5000   | Sí                           | API Flask (depende de db)           |
+| `init-db`  | -      | NO (profile: init)           | Inicializar BD (migraciones + seed) |
+| `frontend` | 3000   | Sí                           | Next.js (depende de backend)        |
 
-Los servicios con `profiles` solo se ejecutan cuando los invocas explicitamente.
+Los servicios con `profiles` solo se ejecutan cuando los invocas explícitamente.
 
 ## Migraciones de Base de Datos
 
 Este proyecto usa **Alembic** para gestionar el schema de la base de datos.
 
-### Crear una Migracion
+### Crear una Migración
 
 Cuando modifiques modelos en `src/models/models.py`:
 
 ```bash
-# Generar migracion automaticamente
-docker-compose run --rm app alembic revision --autogenerate -m "Descripcion del cambio"
+# Generar migración automáticamente
+docker-compose --profile init run --rm init-db alembic revision --autogenerate -m "Descripcion del cambio"
 
-# Aplicar migracion
-docker-compose run --rm app alembic upgrade head
+# Aplicar migración
+docker-compose --profile init run --rm init-db alembic upgrade head
 ```
 
 ### Ver Estado de Migraciones
 
 ```bash
 # Ver historial
-docker-compose run --rm app alembic history
+docker-compose --profile init run --rm init-db alembic history
 
-# Ver migracion actual
-docker-compose run --rm app alembic current
+# Ver migración actual
+docker-compose --profile init run --rm init-db alembic current
 ```
 
-### Revertir Migracion
+### Revertir Migración
 
 ```bash
-# Revertir última migracion
-docker-compose run --rm app alembic downgrade -1
+# Revertir última migración
+docker-compose --profile init run --rm init-db alembic downgrade -1
 
-# Revertir a version especifica
-docker-compose run --rm app alembic downgrade <revision_id>
+# Revertir a versión específica
+docker-compose --profile init run --rm init-db alembic downgrade <revision_id>
 ```
 
 ## Datos Iniciales (Seed)
@@ -373,7 +379,7 @@ El archivo `src/db/seed.py` puebla la base de datos con:
 
 ```bash
 # Dentro de Docker
-docker-compose run --rm app python src/db/seed.py
+docker-compose --profile init run --rm init-db python src/db/seed.py
 ```
 
 El seed es **idempotente**: solo inserta datos que no existen.

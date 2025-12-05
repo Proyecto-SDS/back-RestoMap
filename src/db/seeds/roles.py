@@ -1,8 +1,7 @@
-import logging
-
+from config import get_logger
 from models import Rol
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_roles(db):

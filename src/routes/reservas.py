@@ -4,13 +4,13 @@ Endpoints: /api/reservas/*
 """
 
 import json
-import logging
 import traceback
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from sqlalchemy.orm import joinedload
 
+from config import get_logger
 from database import db_session
 from models import (
     Local,
@@ -19,15 +19,20 @@ from models import (
     ReservaMesa,
 )
 from models.models import EstadoReservaEnum
+from schemas import ReservaCreateInputSchema
 from services.qr_service import crear_qr_reserva, generar_qr_imagen
 from utils.jwt_helper import requerir_auth_persona
+from utils.validation import validate_json
+
+logger = get_logger(__name__)
 
 reservas_bp = Blueprint("reservas", __name__, url_prefix="/api/reservas")
 
 
 @reservas_bp.route("/", methods=["POST"])
 @requerir_auth_persona
-def crear_reserva(user_id):
+@validate_json(ReservaCreateInputSchema)
+def crear_reserva(data: ReservaCreateInputSchema, user_id):
     """
     Crear nueva reserva para un local
 
@@ -36,8 +41,8 @@ def crear_reserva(user_id):
 
     Body:
         {
-            "localId": "1",
-            "mesaId": "1",
+            "localId": 1,
+            "mesaId": 1,
             "fecha": "2024-11-25",
             "hora": "19:30",
             "numeroPersonas": 4
@@ -61,9 +66,7 @@ def crear_reserva(user_id):
         }
 
     Response 400:
-        {"error": "localId, mesaId, fecha y hora son requeridos"}
-        {"error": "Formato de fecha invalido"}
-        {"error": "La fecha debe ser futura"}
+        {"error": "Datos invalidos", "details": [...]}
         {"error": "Mesa no disponible para esta fecha y hora"}
 
     Response 404:
@@ -71,42 +74,15 @@ def crear_reserva(user_id):
         {"error": "Mesa no encontrada"}
     """
     try:
-        data = request.get_json()
+        local_id = data.local_id
+        mesa_id = data.mesa_id
+        fecha_str = data.fecha
+        hora_str = data.hora
+        numero_personas = data.numero_personas
 
-        local_id = data.get("localId")
-        mesa_id = data.get("mesaId")
-        fecha_str = data.get("fecha")
-        hora_str = data.get("hora")
-        numero_personas = data.get("numeroPersonas", 2)
-
-        # Validar campos requeridos
-        if not local_id or not mesa_id or not fecha_str or not hora_str:
-            return jsonify(
-                {"error": "localId, mesaId, fecha y hora son requeridos"}
-            ), 400
-
-        # Convertir IDs
-        try:
-            local_id = int(local_id)
-            mesa_id = int(mesa_id)
-        except ValueError:
-            return jsonify({"error": "localId y mesaId deben ser números"}), 400
-
-        # Parsear fecha
-        try:
-            fecha_reserva = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        except ValueError:
-            return jsonify({"error": "Formato de fecha invalido. Use: YYYY-MM-DD"}), 400
-
-        # Parsear hora
-        try:
-            hora_reserva = datetime.strptime(hora_str, "%H:%M").time()
-        except ValueError:
-            return jsonify({"error": "Formato de hora invalido. Use: HH:MM"}), 400
-
-        # Validar que la fecha sea futura (o hoy)
-        if fecha_reserva < date.today():
-            return jsonify({"error": "La fecha debe ser futura"}), 400
+        # Parsear fecha y hora (ya validados por el schema)
+        fecha_reserva = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        hora_reserva = datetime.strptime(hora_str, "%H:%M").time()
 
         # Verificar que el local existe
         local = db_session.query(Local).filter(Local.id == local_id).first()
@@ -150,7 +126,7 @@ def crear_reserva(user_id):
             ), 400
 
         # Verificar disponibilidad de la mesa para esa fecha y hora
-        # Considerar un rango de ±75 minutos (1 hora y 15 minutos)
+        # Considerar un rango de +/-75 minutos (1 hora y 15 minutos)
         hora_inicio = (
             datetime.combine(date.today(), hora_reserva) - timedelta(minutes=75)
         ).time()
@@ -191,7 +167,7 @@ def crear_reserva(user_id):
         db_session.add(nueva_reserva)
         db_session.flush()  # Para obtener el ID
 
-        # Crear relacion reserva-mesa (sin prioridad, se calcula dinámicamente)
+        # Crear relacion reserva-mesa (sin prioridad, se calcula dinamicamente)
         reserva_mesa = ReservaMesa(
             id_reserva=nueva_reserva.id,
             id_mesa=mesa_id,
@@ -201,8 +177,6 @@ def crear_reserva(user_id):
         db_session.commit()
 
         # Generar QR dinamico para la reserva
-        logger = logging.getLogger(__name__)
-
         try:
             logger.info(
                 f"[DEBUG] Generando QR para reserva {nueva_reserva.id}, mesa {mesa_id}"
@@ -212,7 +186,7 @@ def crear_reserva(user_id):
                 id_reserva=nueva_reserva.id,
                 id_mesa=mesa_id,
                 id_usuario=user_id,
-                minutos_tolerancia=10,  # Expira 10 minutos después de la hora de reserva
+                minutos_tolerancia=10,  # Expira 10 minutos despues de la hora de reserva
             )
             logger.info(f"[DEBUG] QR generado exitosamente. Codigo: {codigo_qr}")
             logger.info(
@@ -279,10 +253,15 @@ def obtener_mis_reservas(user_id):
         reservas = (
             db_session.query(Reserva)
             .options(
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Reserva.local).joinedload(Local.direccion),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Reserva.local).joinedload(Local.fotos),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Reserva.local).joinedload(Local.tipo_local),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Reserva.reservas_mesa).joinedload(ReservaMesa.mesa),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Reserva.qr_dinamicos),
             )
             .filter(Reserva.id_usuario == user_id)

@@ -1,6 +1,8 @@
 import logging
 import os
 
+# Usar logging.getLogger directamente aqui porque este modulo
+# se importa antes de que setup_logging() sea llamado
 logger = logging.getLogger(__name__)
 
 

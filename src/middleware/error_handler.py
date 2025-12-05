@@ -4,14 +4,14 @@ Middleware para manejo centralizado de errores.
 Captura excepciones personalizadas y las convierte en respuestas JSON apropiadas.
 """
 
-import logging
 import traceback
 
 from flask import jsonify
 
+from config import get_logger
 from exceptions import AppError, HTTPError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def register_error_handlers(app):

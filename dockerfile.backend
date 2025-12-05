@@ -1,3 +1,7 @@
+# ============================================
+# DOCKERFILE PARA DESARROLLO LOCAL
+# Usado por docker-compose.yml
+# ============================================
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -7,33 +11,34 @@ ENV TZ=America/Santiago
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Instalar dependencias del sistema
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     libpq-dev \
     tzdata \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Instalar Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+ENV POETRY_HOME=/opt/poetry
+ENV PATH="$POETRY_HOME/bin:$PATH"
+RUN curl -sSL https://install.python-poetry.org | python3 -
 
-# Configurar Poetry para no crear entornos virtuales (usamos el del contenedor)
+# Configurar Poetry
 ENV POETRY_VIRTUALENVS_CREATE=false \
     POETRY_NO_INTERACTION=1
 
-# Copiar archivos de configuración de Poetry
+# Copiar archivos de dependencias
 COPY pyproject.toml poetry.lock ./
 
-# Instalar dependencias (sin instalar el proyecto)
-RUN poetry install --no-root --only main
+# Instalar TODAS las dependencias (incluyendo dev para desarrollo)
+RUN poetry install --no-root
 
-# Copiar codigo
-COPY . .
+# Variables de entorno
+ENV PYTHONPATH=/app/src \
+    PYTHONUNBUFFERED=1 \
+    ENV=development
 
-# Establecer PYTHONPATH para que Python encuentre los modulos en src
-ENV PYTHONPATH=/app/src
-
-# Comando por defecto (ajustado a la nueva estructura)
+# Comando por defecto
 CMD ["python", "src/main.py"]

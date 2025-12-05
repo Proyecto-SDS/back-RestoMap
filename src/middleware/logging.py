@@ -1,15 +1,16 @@
 """
 Middleware para logging de requests HTTP.
 
-Registra información de cada request y response para debugging y auditoría.
+Registra informacion de cada request y response para debugging y auditoria.
 """
 
-import logging
 import time
 
 from flask import g, request
 
-logger = logging.getLogger(__name__)
+from config import get_logger
+
+logger = get_logger(__name__)
 
 
 def setup_request_logging(app):

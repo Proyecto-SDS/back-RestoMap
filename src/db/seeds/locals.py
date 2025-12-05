@@ -1,6 +1,6 @@
-import logging
 from datetime import date, time
 
+from config import get_logger
 from models import (
     Direccion,
     EstadoMesaEnum,
@@ -12,7 +12,7 @@ from models import (
     TipoHorarioEnum,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_locals(db):

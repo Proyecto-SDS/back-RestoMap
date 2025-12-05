@@ -1,9 +1,9 @@
-import logging
 from datetime import date, time, timedelta
 
+from config import get_logger
 from models import EstadoReservaEnum, Reserva, ReservaMesa
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_reservations(db):

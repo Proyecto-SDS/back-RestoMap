@@ -4,15 +4,17 @@ Servicio para generar codigos QR dinamicos para reservas y pedidos
 
 import base64
 import json
-import logging
 import secrets
 from datetime import datetime, timedelta
 from io import BytesIO
 
 import qrcode
 
+from config import get_logger
 from database import db_session
 from models import Mesa, Pedido, QRDinamico, Reserva
+
+logger = get_logger(__name__)
 
 
 def generar_codigo_unico() -> str:
@@ -64,13 +66,11 @@ def crear_qr_reserva(
         id_reserva: ID de la reserva
         id_mesa: ID de la mesa asociada
         id_usuario: ID del usuario que realiza la reserva
-        minutos_tolerancia: Minutos de tolerancia después de la hora de reserva (default: 10 minutos)
+        minutos_tolerancia: Minutos de tolerancia despues de la hora de reserva (default: 10 minutos)
 
     Returns:
         Tupla (codigo, qr_base64)
     """
-    logger = logging.getLogger(__name__)
-
     logger.info(f"[QR Service] Iniciando creacion de QR para reserva {id_reserva}")
 
     # Verificar que la reserva existe

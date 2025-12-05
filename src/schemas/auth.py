@@ -1,16 +1,17 @@
 """
-Schemas para autenticación y usuarios.
+Schemas para autenticacion y usuarios.
 """
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class UsuarioBase(BaseModel):
     """Schema base de usuario"""
 
-    nombre: str
+    nombre: str = Field(..., min_length=1)
     correo: EmailStr
     telefono: str | None = None
 
@@ -18,20 +19,33 @@ class UsuarioBase(BaseModel):
 class UsuarioCreateSchema(UsuarioBase):
     """Schema para crear usuario"""
 
-    contrasena: str
+    contrasena: str = Field(..., min_length=6)
     id_rol: int = 2  # Por defecto: usuario normal
 
 
 class UsuarioUpdateSchema(BaseModel):
     """Schema para actualizar usuario"""
 
-    nombre: str | None = None
+    nombre: str | None = Field(None, min_length=1)
     telefono: str | None = None
     correo: EmailStr | None = None
 
+    # pyrefly: ignore  # bad-argument-type
+    @field_validator("telefono")
+    @classmethod
+    def validar_telefono(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        # Limpiar telefono
+        telefono_limpio = v.replace("+56", "").replace(" ", "").replace("-", "")
+        if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
+            msg = "Telefono invalido. Debe tener 9 digitos"
+            raise ValueError(msg)
+        return telefono_limpio
+
 
 class UsuarioResponseSchema(UsuarioBase):
-    """Schema de respuesta de usuario (sin contraseña)"""
+    """Schema de respuesta de usuario (sin contrasena)"""
 
     id: int
     id_rol: int | None = None
@@ -55,13 +69,47 @@ class LoginSchema(BaseModel):
     """Schema para login"""
 
     correo: EmailStr
-    contrasena: str
+    contrasena: str = Field(..., min_length=1)
+    tipo_login: Literal["persona", "empresa"] = "persona"
 
 
-class RegisterSchema(UsuarioCreateSchema):
-    """Schema para registro (alias de UsuarioCreateSchema)"""
+class RegisterSchema(BaseModel):
+    """Schema para registro de usuario"""
 
-    pass
+    nombre: str = Field(..., min_length=1)
+    correo: EmailStr
+    contrasena: str = Field(..., min_length=6)
+    telefono: str
+
+    # pyrefly: ignore  # bad-argument-type
+    @field_validator("telefono")
+    @classmethod
+    def validar_telefono(cls, v: str) -> str:
+        # Limpiar telefono
+        telefono_limpio = v.replace("+56", "").replace(" ", "").replace("-", "")
+        if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
+            msg = "Telefono invalido. Debe tener 9 digitos"
+            raise ValueError(msg)
+        return telefono_limpio
+
+
+class ProfileUpdateSchema(BaseModel):
+    """Schema para actualizar perfil"""
+
+    nombre: str | None = Field(None, min_length=1)
+    telefono: str | None = None
+
+    # pyrefly: ignore  # bad-argument-type
+    @field_validator("telefono")
+    @classmethod
+    def validar_telefono(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        telefono_limpio = v.replace("+56", "").replace(" ", "").replace("-", "")
+        if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
+            msg = "Telefono invalido. Debe tener 9 digitos"
+            raise ValueError(msg)
+        return telefono_limpio
 
 
 class RolSchema(BaseModel):

@@ -1,8 +1,7 @@
-import logging
-
+from config import get_logger
 from models import Usuario
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_users(db):
@@ -38,7 +37,7 @@ def create_users(db):
             ),
             Usuario(
                 id_rol=4,
-                id_local=1,
+                id_local=2,
                 nombre="Carlos Mesero",
                 correo="mesero@test.cl",
                 contrasena=password_hash,
@@ -46,11 +45,27 @@ def create_users(db):
             ),
             Usuario(
                 id_rol=3,
-                id_local=1,
-                nombre="Ana Chef",
-                correo="chef@test.cl",
+                id_local=2,
+                nombre="Ana Cocinera",
+                correo="cocinero@test.cl",
                 contrasena=password_hash,
                 telefono="933332222",
+            ),
+            Usuario(
+                id_rol=5,
+                id_local=2,
+                nombre="Luis Bartender",
+                correo="bartender@test.cl",
+                contrasena=password_hash,
+                telefono="922221111",
+            ),
+            Usuario(
+                id_rol=2,
+                id_local=2,
+                nombre="Gabriela Gerente",
+                correo="gerente@test.cl",
+                contrasena=password_hash,
+                telefono="911110000",
             ),
         ]
     )

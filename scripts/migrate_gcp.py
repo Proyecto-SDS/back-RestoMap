@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """
-Script de migración para Google Cloud Platform (Cloud Run)
-Ejecuta las migraciones de Alembic de forma segura en producción
+Script de migracion para Google Cloud Platform (Cloud Run)
+Ejecuta las migraciones de Alembic de forma segura en produccion
 """
 
-import logging
 import os
 import sys
+from pathlib import Path
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Agregar src al path para imports
+src_dir = Path(__file__).resolve().parent.parent / "src"
+sys.path.insert(0, str(src_dir))
+
+# Configurar logging usando el sistema centralizado
+from config import get_logger, setup_logging  # noqa: E402
+
+setup_logging()
+logger = get_logger(__name__)
 
 
 def validate_environment():

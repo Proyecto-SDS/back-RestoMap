@@ -6,19 +6,25 @@ Endpoints: /api/opiniones/*
 import traceback
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from sqlalchemy.orm import joinedload
 
+from config import get_logger
 from database import db_session
 from models import Local, Opinion, Usuario
+from schemas import OpinionCreateSchema
 from utils.jwt_helper import requerir_auth_persona
+from utils.validation import validate_json
+
+logger = get_logger(__name__)
 
 opiniones_bp = Blueprint("opiniones", __name__, url_prefix="/api/opiniones")
 
 
 @opiniones_bp.route("/", methods=["POST"])
 @requerir_auth_persona
-def crear_opinion(user_id):
+@validate_json(OpinionCreateSchema)
+def crear_opinion(data: OpinionCreateSchema, user_id):
     """
     Crear nueva opinion para un local
 
@@ -27,7 +33,7 @@ def crear_opinion(user_id):
 
     Body:
         {
-            "localId": "1",
+            "localId": 1,
             "puntuacion": 4.5,
             "comentario": "Excelente comida y servicio"
         }
@@ -39,7 +45,7 @@ def crear_opinion(user_id):
             "opinion": {
                 "id": 1,
                 "localId": "1",
-                "usuario": "Juan Pérez",
+                "usuario": "Juan Perez",
                 "puntuacion": 4.5,
                 "comentario": "Excelente comida...",
                 "fecha": "2024-11-24T12:00:00"
@@ -47,46 +53,16 @@ def crear_opinion(user_id):
         }
 
     Response 400:
-        {"error": "localId, puntuacion y comentario son requeridos"}
-        {"error": "La puntuacion debe estar entre 1 y 5"}
-        {"error": "El comentario debe tener entre 10 y 500 caracteres"}
+        {"error": "Datos invalidos", "details": [...]}
         {"error": "Ya tienes una opinion para este local"}
 
     Response 404:
         {"error": "Local no encontrado"}
     """
     try:
-        data = request.get_json()
-
-        local_id = data.get("localId")
-        puntuacion = data.get("puntuacion")
-        comentario = data.get("comentario", "").strip()
-
-        # Validar campos requeridos
-        if not local_id or puntuacion is None or not comentario:
-            return jsonify(
-                {"error": "localId, puntuacion y comentario son requeridos"}
-            ), 400
-
-        # Convertir local_id a int
-        try:
-            local_id = int(local_id)
-        except ValueError:
-            return jsonify({"error": "localId debe ser un número"}), 400
-
-        # Validar puntuacion
-        try:
-            puntuacion = float(puntuacion)
-            if puntuacion < 1 or puntuacion > 5:
-                return jsonify({"error": "La puntuacion debe estar entre 1 y 5"}), 400
-        except (ValueError, TypeError):
-            return jsonify({"error": "Puntuacion invalida"}), 400
-
-        # Validar comentario
-        if len(comentario) < 10 or len(comentario) > 500:
-            return jsonify(
-                {"error": "El comentario debe tener entre 10 y 500 caracteres"}
-            ), 400
+        local_id = data.local_id
+        puntuacion = data.puntuacion
+        comentario = data.comentario.strip()
 
         # Verificar que el local existe
         local = db_session.query(Local).filter(Local.id == local_id).first()
@@ -172,6 +148,7 @@ def obtener_mis_opiniones(user_id):
     try:
         opiniones = (
             db_session.query(Opinion)
+            # pyrefly: ignore  # bad-argument-type
             .options(joinedload(Opinion.local))
             .filter(Opinion.id_usuario == user_id, Opinion.eliminado_el.is_(None))
             .order_by(Opinion.creado_el.desc())
@@ -214,7 +191,7 @@ def obtener_opinion_usuario(local_id, user_id):
         {
             "id": 1,
             "localId": "1",
-            "usuario": "Juan Pérez",
+            "usuario": "Juan Perez",
             "puntuacion": 4.5,
             "comentario": "Excelente comida...",
             "fecha": "2024-11-24T12:00:00"
@@ -226,6 +203,7 @@ def obtener_opinion_usuario(local_id, user_id):
     try:
         opinion = (
             db_session.query(Opinion)
+            # pyrefly: ignore  # bad-argument-type
             .options(joinedload(Opinion.usuario))
             .filter(
                 Opinion.id_usuario == user_id,

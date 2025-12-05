@@ -3,16 +3,17 @@ Rutas de favoritos
 Endpoints: /api/favoritos/*
 """
 
-import logging
-
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from sqlalchemy import select
 
+from config import get_logger
 from database import SessionLocal
 from models.models import Favorito, Local
+from schemas import FavoritoCreateSchema
 from utils.jwt_helper import requerir_auth_persona
+from utils.validation import validate_json
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 favoritos_bp = Blueprint("favoritos", __name__, url_prefix="/api/favoritos")
 
@@ -84,7 +85,8 @@ def get_favoritos(user_id):
 
 @favoritos_bp.route("/", methods=["POST"])
 @requerir_auth_persona
-def add_favorito(user_id):
+@validate_json(FavoritoCreateSchema)
+def add_favorito(data: FavoritoCreateSchema, user_id):
     """
     Agregar un local a favoritos
 
@@ -93,7 +95,7 @@ def add_favorito(user_id):
 
     Body:
         {
-            "localId": "5"
+            "localId": 5
         }
 
     Response 201:
@@ -108,22 +110,12 @@ def add_favorito(user_id):
         }
 
     Response 400:
-        {"error": "localId es requerido"}
+        {"error": "Datos invalidos", "details": [...]}
         {"error": "Local no encontrado"}
         {"error": "Este local ya esta en favoritos"}
     """
     try:
-        data = request.get_json()
-
-        local_id = data.get("localId")
-
-        if not local_id:
-            return jsonify({"error": "localId es requerido"}), 400
-
-        try:
-            local_id = int(local_id)
-        except (ValueError, TypeError):
-            return jsonify({"error": "localId debe ser un número valido"}), 400
+        local_id = data.local_id
 
         db = next(get_db())
 

@@ -1,48 +1,88 @@
+# ============================================
+# DOCKER COMPOSE - DESARROLLO LOCAL
+# ============================================
+# Uso:
+#   docker-compose up db          # Solo base de datos
+#   docker-compose up backend     # Backend + DB
+#   docker-compose up             # Todo (backend + frontend + db)
+#   docker-compose --profile init up init-db  # Inicializar DB
+# ============================================
+
 services:
+  # ============================================
+  # BASE DE DATOS POSTGRESQL
+  # ============================================
   db:
     container_name: db-restomap
-    image: postgres:18
+    image: postgres:16-alpine
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      POSTGRES_DB: "${POSTGRES_DB}"
-      POSTGRES_USER: "${POSTGRES_USER}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB:-restomap}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       TZ: America/Santiago
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-restomap}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  app:
-    container_name: app-restomap
+  # ============================================
+  # BACKEND FLASK
+  # ============================================
+  backend:
+    container_name: backend-restomap
     build:
       context: .
       dockerfile: dockerfile.backend
+    command: python src/main.py
+    tty: true # Habilita colores ANSI en logs
+    ports:
+      - "5000:5000"
     env_file:
       - .env
     environment:
+      # Database
       DB_HOST: db
-      DB_USER: "${POSTGRES_USER}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      DB_NAME: "${POSTGRES_DB}"
+      DB_USER: "${POSTGRES_USER:-postgres}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      DB_NAME: "${POSTGRES_DB:-restomap}"
       DB_PORT: 5432
+      # App
+      ENV: development
       PYTHONPATH: /app/src
       TZ: America/Santiago
+      # CORS
+      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      # JWT (usar valor seguro en .env)
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-dev-secret-key-change-in-production-2025}"
     depends_on:
       db:
         condition: service_healthy
-    profiles:
-      - tools
     volumes:
-      - .:/app
+      # Mount codigo para hot-reload
+      - ./src:/app/src:ro
+      - ./alembic:/app/alembic:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
+  # ============================================
+  # INICIALIZADOR DE BASE DE DATOS
+  # ============================================
   init-db:
     container_name: init-db-restomap
     build:
@@ -53,9 +93,9 @@ services:
       - .env
     environment:
       DB_HOST: db
-      DB_USER: "${POSTGRES_USER}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      DB_NAME: "${POSTGRES_DB}"
+      DB_USER: "${POSTGRES_USER:-postgres}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      DB_NAME: "${POSTGRES_DB:-restomap}"
       DB_PORT: 5432
       PYTHONPATH: /app/src
       TZ: America/Santiago
@@ -67,32 +107,9 @@ services:
     volumes:
       - .:/app
 
-  backend:
-    container_name: backend-restomap
-    build:
-      context: .
-      dockerfile: dockerfile.backend
-    command: python src/main.py
-    ports:
-      - "5000:5000"
-    env_file:
-      - .env
-    environment:
-      DB_HOST: db
-      DB_USER: "${POSTGRES_USER}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      DB_NAME: "${POSTGRES_DB}"
-      DB_PORT: 5432
-      PYTHONPATH: /app/src
-      TZ: America/Santiago
-      # Permitir CORS desde el frontend en Docker
-      ALLOWED_ORIGINS: "http://localhost:3000"
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - .:/app
-
+  # ============================================
+  # FRONTEND NEXT.JS
+  # ============================================
   frontend:
     container_name: frontend-restomap
     build:
@@ -103,14 +120,16 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5000
       - NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
-      # Importante para que el hot-reload funcione bien en Windows/Docker
+      # Hot-reload en Windows/Docker
       - WATCHPACK_POLLING=true
     volumes:
       - ../frontend:/app
       - /app/node_modules
       - /app/.next
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
+    name: restomap-pgdata

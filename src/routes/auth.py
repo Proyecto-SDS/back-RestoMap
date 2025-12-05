@@ -3,18 +3,20 @@ Rutas de autenticacion
 Endpoints: /api/auth/*
 """
 
-import logging
-
 # pyrefly: ignore [missing-import]
 import bcrypt
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
+from pydantic import ValidationError
 from sqlalchemy import select
 
+from config import get_logger
 from database import SessionLocal
 from models.models import Local, Rol, Usuario
+from schemas import LoginSchema, ProfileUpdateSchema, RegisterSchema
 from utils.jwt_helper import crear_token, requerir_auth
+from utils.validation import validate_json
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -29,18 +31,20 @@ def get_db():
 
 
 @auth_bp.route("/login", methods=["POST"])
-def login():
+@validate_json(LoginSchema)
+def login(data: LoginSchema):
     """
-    Iniciar sesion con correo y contraseña
+    Iniciar sesion con correo y contrasena
 
-    Detecta automáticamente si es persona o empleado:
+    Detecta automaticamente si es persona o empleado:
     - Persona: rol=null, id_local=null
     - Empleado: rol y id_local presentes
 
     Body:
         {
             "correo": "usuario@example.com",
-            "contrasena": "password123"
+            "contrasena": "password123",
+            "tipo_login": "persona" | "empresa"
         }
 
     Response 200 (Persona):
@@ -49,7 +53,7 @@ def login():
             "token": "eyJhbGc...",
             "user": {
                 "id": "1",
-                "nombre": "Juan Pérez",
+                "nombre": "Juan Perez",
                 "correo": "usuario@example.com",
                 "telefono": "+56912345678",
                 "creado_el": "2024-01-01T12:00:00"
@@ -62,7 +66,7 @@ def login():
             "token": "eyJhbGc...",
             "user": {
                 "id": "2",
-                "nombre": "María Mesera",
+                "nombre": "Maria Mesera",
                 "correo": "mesero@test.cl",
                 "telefono": "+56912345678",
                 "rol": "mesero",
@@ -73,31 +77,20 @@ def login():
         }
 
     Response 400:
-        {"error": "Correo y contraseña son requeridos"}
+        {"error": "Datos invalidos", "details": [...]}
         {"error": "Cuenta de empleado sin local asignado"}
         {"error": "Cuenta de empleado sin rol asignado"}
 
     Response 401:
-        {"error": "Correo o contraseña incorrectos"}
+        {"error": "Correo o contrasena incorrectos"}
 
     Response 404:
         {"error": "Local no encontrado"}
     """
     try:
-        data = request.get_json()
-
-        correo = data.get("correo", "").strip().lower()
-        contrasena = data.get("contrasena", "")
-        tipo_login = data.get(
-            "tipo_login", "persona"
-        )  # Default a persona para retrocompatibilidad
-
-        if not correo or not contrasena:
-            return jsonify({"error": "Correo y contraseña son requeridos"}), 400
-
-        # Validar tipo_login
-        if tipo_login not in ["persona", "empresa"]:
-            return jsonify({"error": "tipo_login debe ser 'persona' o 'empresa'"}), 400
+        correo = data.correo.lower()
+        contrasena = data.contrasena
+        tipo_login = data.tipo_login
 
         db = next(get_db())
 
@@ -107,32 +100,32 @@ def login():
         ).scalar_one_or_none()
 
         if not usuario:
-            return jsonify({"error": "Correo o contraseña incorrectos"}), 401
+            return jsonify({"error": "Correo o contrasena incorrectos"}), 401
 
-        # Verificar contraseña con bcrypt
+        # Verificar contrasena con bcrypt
         if not bcrypt.checkpw(
             contrasena.encode("utf-8"), usuario.contrasena.encode("utf-8")
         ):
-            return jsonify({"error": "Correo o contraseña incorrectos"}), 401
+            return jsonify({"error": "Correo o contrasena incorrectos"}), 401
 
-        # VALIDACIÓN: Verificar que el tipo de login coincida con el tipo de cuenta
+        # VALIDACION: Verificar que el tipo de login coincida con el tipo de cuenta
         es_empleado = usuario.id_local is not None
 
         if tipo_login == "persona" and es_empleado:
             return jsonify(
                 {
-                    "error": "Esta es una cuenta de empleado. Por favor usa el tab 'Empresa' para iniciar sesión"
+                    "error": "Esta es una cuenta de empleado. Por favor usa el tab 'Empresa' para iniciar sesion"
                 }
             ), 400
 
         if tipo_login == "empresa" and not es_empleado:
             return jsonify(
                 {
-                    "error": "Esta es una cuenta de persona. Por favor usa el tab 'Persona' para iniciar sesión"
+                    "error": "Esta es una cuenta de persona. Por favor usa el tab 'Persona' para iniciar sesion"
                 }
             ), 400
 
-        # VALIDACIÓN: Verificar coherencia de datos
+        # VALIDACION: Verificar coherencia de datos
         # Si tiene id_local, DEBE tener id_rol (empleado)
         if usuario.id_local is not None and usuario.id_rol is None:
             logger.error(
@@ -140,10 +133,10 @@ def login():
             )
             return jsonify({"error": "Cuenta de empleado sin rol asignado"}), 400
 
-        # Formatear teléfono
+        # Formatear telefono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
 
-        # CASO 1: Usuario Persona/Cliente (id_local=null, id_rol debería ser "cliente")
+        # CASO 1: Usuario Persona/Cliente (id_local=null, id_rol deberia ser "cliente")
         if usuario.id_local is None:
             # Obtener el nombre del rol si existe
             rol_nombre = None
@@ -166,7 +159,7 @@ def login():
                             "nombre": usuario.nombre,
                             "correo": usuario.correo,
                             "telefono": telefono_formateado,
-                            "rol": rol_nombre,  # Incluir rol en la respuesta (debería ser "cliente")
+                            "rol": rol_nombre,  # Incluir rol en la respuesta (deberia ser "cliente")
                             "creado_el": usuario.creado_el.isoformat()
                             if usuario.creado_el
                             else None,
@@ -190,7 +183,7 @@ def login():
 
         rol_nombre = rol.nombre
 
-        # Obtener información del Local (VERIFICAR EN BD antes de crear token)
+        # Obtener informacion del Local (VERIFICAR EN BD antes de crear token)
         local = db.execute(
             select(Local).where(Local.id == usuario.id_local)
         ).scalar_one_or_none()
@@ -229,13 +222,14 @@ def login():
 
 
 @auth_bp.route("/register", methods=["POST"])
-def register():
+@validate_json(RegisterSchema)
+def register(data: RegisterSchema):
     """
     Registrar nuevo usuario
 
     Body:
         {
-            "nombre": "Juan Pérez",
+            "nombre": "Juan Perez",
             "correo": "usuario@example.com",
             "contrasena": "password123",
             "telefono": "912345678"
@@ -248,31 +242,14 @@ def register():
         }
 
     Response 400:
-        {"error": "Todos los campos son requeridos"}
+        {"error": "Datos invalidos", "details": [...]}
         {"error": "Este correo ya esta registrado"}
     """
     try:
-        data = request.get_json()
-
-        nombre = data.get("nombre", "").strip()
-        correo = data.get("correo", "").strip().lower()
-        contrasena = data.get("contrasena", "")
-        telefono = data.get("telefono", "").strip()
-
-        # Validar campos requeridos
-        if not nombre or not correo or not contrasena or not telefono:
-            return jsonify({"error": "Todos los campos son requeridos"}), 400
-
-        # Validar longitud de contraseña
-        if len(contrasena) < 6:
-            return jsonify(
-                {"error": "La contraseña debe tener al menos 6 caracteres"}
-            ), 400
-
-        # Limpiar teléfono (remover +56 si existe)
-        telefono_limpio = telefono.replace("+56", "").replace(" ", "").replace("-", "")
-        if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
-            return jsonify({"error": "Teléfono invalido. Debe tener 9 digitos"}), 400
+        nombre = data.nombre.strip()
+        correo = data.correo.lower()
+        contrasena = data.contrasena
+        telefono_limpio = data.telefono  # Ya viene limpio del schema
 
         db = next(get_db())
 
@@ -284,7 +261,7 @@ def register():
         if usuario_existente:
             return jsonify({"error": "Este correo ya esta registrado"}), 400
 
-        # Hash de contraseña con bcrypt
+        # Hash de contrasena con bcrypt
         hashed_password = bcrypt.hashpw(contrasena.encode("utf-8"), bcrypt.gensalt())
 
         # Obtener rol "cliente" para usuarios normales (personas)
@@ -311,6 +288,8 @@ def register():
             {"success": True, "message": "Usuario registrado exitosamente"}
         ), 201
 
+    except ValidationError as e:
+        return jsonify({"error": "Datos invalidos", "details": e.errors()}), 400
     except Exception as e:
         logger.error(f"Error en register: {e!s}")
         return jsonify({"error": "Error al procesar la solicitud"}), 500
@@ -318,7 +297,7 @@ def register():
 
 @auth_bp.route("/logout", methods=["POST"])
 @requerir_auth
-def logout(user_id=None, user_rol=None, id_local=None):
+def logout(_user_id=None, _user_rol=None, _id_local=None):
     """
     Cerrar sesion (actualmente solo responde exitosamente)
 
@@ -345,7 +324,7 @@ def get_profile(user_id, user_rol):
     Response 200:
         {
             "id": "1",
-            "nombre": "Juan Pérez",
+            "nombre": "Juan Perez",
             "correo": "usuario@example.com",
             "telefono": "+56912345678",
             "rol": "usuario",
@@ -366,7 +345,7 @@ def get_profile(user_id, user_rol):
         if not usuario:
             return jsonify({"error": "Usuario no encontrado"}), 404
 
-        # Formatear teléfono
+        # Formatear telefono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
 
         return jsonify(
@@ -389,7 +368,8 @@ def get_profile(user_id, user_rol):
 
 @auth_bp.route("/profile", methods=["PUT"])
 @requerir_auth
-def update_profile(user_id, user_rol):
+@validate_json(ProfileUpdateSchema)
+def update_profile(data: ProfileUpdateSchema, user_id, user_rol):
     """
     Actualizar perfil del usuario autenticado
 
@@ -398,7 +378,7 @@ def update_profile(user_id, user_rol):
 
     Body:
         {
-            "nombre": "Juan Pérez Actualizado",
+            "nombre": "Juan Perez Actualizado",
             "telefono": "987654321"
         }
 
@@ -408,7 +388,7 @@ def update_profile(user_id, user_rol):
             "message": "Perfil actualizado exitosamente",
             "user": {
                 "id": "1",
-                "nombre": "Juan Pérez Actualizado",
+                "nombre": "Juan Perez Actualizado",
                 "correo": "usuario@example.com",
                 "telefono": "+56987654321",
                 "rol": "usuario"
@@ -416,13 +396,11 @@ def update_profile(user_id, user_rol):
         }
 
     Response 400:
-        {"error": "Teléfono invalido"}
+        {"error": "Datos invalidos", "details": [...]}
     """
     try:
-        data = request.get_json()
-
-        nombre = data.get("nombre", "").strip()
-        telefono = data.get("telefono", "").strip()
+        nombre = data.nombre
+        telefono = data.telefono  # Ya viene limpio del schema
 
         if not nombre and not telefono:
             return jsonify(
@@ -441,22 +419,15 @@ def update_profile(user_id, user_rol):
 
         # Actualizar nombre si se proporciona
         if nombre:
-            usuario.nombre = nombre
+            usuario.nombre = nombre.strip()
 
-        # Actualizar teléfono si se proporciona
+        # Actualizar telefono si se proporciona
         if telefono:
-            telefono_limpio = (
-                telefono.replace("+56", "").replace(" ", "").replace("-", "")
-            )
-            if not telefono_limpio.isdigit() or len(telefono_limpio) != 9:
-                return jsonify(
-                    {"error": "Teléfono invalido. Debe tener 9 digitos"}
-                ), 400
-            usuario.telefono = int(telefono_limpio)
+            usuario.telefono = int(telefono)
 
         db.commit()
 
-        # Formatear teléfono para respuesta
+        # Formatear telefono para respuesta
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
 
         return jsonify(

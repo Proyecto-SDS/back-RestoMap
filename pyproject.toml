@@ -1,97 +1,135 @@
 [tool.poetry]
 name = "restomap-backend"
-version = "0.1.0"
-description = "Backend del sistema RestoMap - Gestión de restaurantes"
+version = "1.0.0"
+description = "Backend del sistema RestoMap - Gestion de restaurantes"
 authors = ["Proyecto SDS"]
 readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.12.10"
-alembic = "^1.17.2"
-annotated-types = "^0.7.0"
-blinker = "^1.9.0"
-click = "^8.3.1"
-colorama = "^0.4.6"
-dnspython = "^2.8.0"
-email-validator = "^2.3.0"
+python = "^3.12"
+# Framework Web
 flask = "^3.1.2"
 flask-cors = "^6.0.1"
 flask-migrate = "^4.1.0"
 flask-sqlalchemy = "^3.1.1"
-greenlet = "^3.3.0"
 gunicorn = "^23.0.0"
-idna = "^3.11"
-itsdangerous = "^2.2.0"
-jinja2 = "^3.1.6"
-mako = "^1.3.10"
-markupsafe = "^3.0.3"
-packaging = "^25.0"
+werkzeug = "^3.1.4"
+
+# Base de datos
+sqlalchemy = "^2.0.44"
 psycopg2-binary = "^2.9.11"
+alembic = "^1.17.2"
+
+# Validacion y tipos
 pydantic = "^2.12.5"
+pydantic-settings = "^2.12.0"
+email-validator = "^2.3.0"
+
+# Autenticacion
 pyjwt = "^2.10.1"
 bcrypt = "^5.0.0"
-pydantic-core = "^2.41.5"
-pydantic-settings = "^2.12.0"
+
+# Utilidades
 python-dotenv = "^1.2.1"
-sqlalchemy = "^2.0.44"
-typing-extensions = "^4.15.0"
-typing-inspection = "^0.4.2"
-werkzeug = "^3.1.4"
 qrcode = "^8.2"
 pillow = "^12.0.0"
-pyrefly = "^0.44.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.14.8"
+pyrefly = "^0.44.1"
+pytest = "^8.0.0"
+pytest-cov = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 # ============================================
-# CONFIGURACIÓN DE ALEMBIC (PEP 621)
+# RUFF - Mover configuracion aqui (recomendado)
 # ============================================
-[tool.alembic]
-# Ruta a los scripts de migración
-script_location = "alembic"
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py312"
 
-# Rutas adicionales a agregar a sys.path
-prepend_sys_path = [
-    ".",
-    "src"
+exclude = [
+    ".venv",
+    "venv",
+    "alembic",
+    "__pycache__",
+    ".git",
+    "build",
+    "dist",
 ]
 
-# Plantilla para nombres de archivos de migración
-# Formato: AAAA_MM_DD_HHMM-{rev}_{slug}
-file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
+[tool.ruff.lint]
+select = [
+    "F",     # Pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "C90",   # mccabe
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "PL",    # Pylint
+    "RUF",   # Ruff-specific rules
+]
 
-# Zona horaria para timestamps (requiere python>=3.9)
-timezone = "America/Santiago"
+ignore = [
+    "E501",    # Line too long (lo maneja el formatter)
+    "PLR0913", # Too many arguments
+    "PLR2004", # Magic value used in comparison
+    "PLR0911", # Too many return statements
+    "PLR0912", # Too many branches
+    "PLR0915", # Too many statements
+    "C901",    # Complex function
+    "PLC0415", # Import outside top-level
+]
 
-# Longitud máxima del campo "slug"
-truncate_slug_length = 40
+fixable = ["ALL"]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Ejecutar environment durante 'revision' command
-revision_environment = false
+[tool.ruff.lint.mccabe]
+max-complexity = 15
 
-# Permitir archivos .pyc/.pyo sin .py
-sourceless = false
+[tool.ruff.lint.isort]
+known-first-party = ["config", "database", "models", "routes", "schemas", "services", "utils", "middleware", "exceptions"]
 
-# Búsqueda recursiva en directorios de versiones
-recursive_version_locations = false
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
 
-# Encoding de salida
-output_encoding = "utf-8"
+# ============================================
+# PYTEST
+# ============================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
 
-# Post-write hooks para formatear código generado
-# DESHABILITADO: ruff no está disponible en el contenedor de producción
-# Para formatear migraciones localmente, ejecuta: ruff format alembic/versions/
-# [[tool.alembic.post_write_hooks]]
-# name = "ruff"
-# type = "console_scripts"
-# entrypoint = "ruff"
-# options = "format REVISION_SCRIPT_FILENAME"
+# ============================================
+# COVERAGE
+# ============================================
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
 
 [tool.poetry.urls]
 repository = "https://github.com/Proyecto-SDS/back-RestoMap"

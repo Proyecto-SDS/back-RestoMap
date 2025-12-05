@@ -1,10 +1,10 @@
 """
-Schemas para reservas y QR dinámicos.
+Schemas para reservas y QR dinamicos.
 """
 
 from datetime import date, datetime, time
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from models.models import EstadoReservaEnum
 
@@ -24,6 +24,46 @@ class ReservaCreateSchema(ReservaBase):
     pass
 
 
+class ReservaCreateInputSchema(BaseModel):
+    """Schema para crear reserva desde el frontend"""
+
+    local_id: int = Field(..., gt=0, alias="localId")
+    mesa_id: int = Field(..., gt=0, alias="mesaId")
+    fecha: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    hora: str = Field(..., pattern=r"^\d{2}:\d{2}$")
+    numero_personas: int = Field(default=2, ge=1, le=20, alias="numeroPersonas")
+
+    class Config:
+        populate_by_name = True
+
+    # pyrefly: ignore  # bad-argument-type
+    @field_validator("fecha")
+    @classmethod
+    def validar_fecha(cls, v: str) -> str:
+        try:
+            fecha_parsed = datetime.strptime(v, "%Y-%m-%d").date()
+            if fecha_parsed < date.today():
+                msg = "La fecha debe ser futura"
+                raise ValueError(msg)
+        except ValueError as e:
+            if "La fecha debe ser futura" in str(e):
+                raise
+            msg = "Formato de fecha invalido. Use: YYYY-MM-DD"
+            raise ValueError(msg) from e
+        return v
+
+    # pyrefly: ignore  # bad-argument-type
+    @field_validator("hora")
+    @classmethod
+    def validar_hora(cls, v: str) -> str:
+        try:
+            datetime.strptime(v, "%H:%M")
+        except ValueError as e:
+            msg = "Formato de hora invalido. Use: HH:MM"
+            raise ValueError(msg) from e
+        return v
+
+
 class ReservaUpdateSchema(BaseModel):
     """Schema para actualizar reserva"""
 
@@ -39,7 +79,7 @@ class ReservaResponseSchema(ReservaBase):
     estado: EstadoReservaEnum
     creado_el: datetime | None = None
     expirado_el: datetime | None = None
-    prioridad: str | None = None  # Calculada dinámicamente
+    prioridad: str | None = None  # Calculada dinamicamente
 
     class Config:
         from_attributes = True
@@ -52,14 +92,14 @@ class ReservaSchema(ReservaBase):
     estado: EstadoReservaEnum
     creado_el: datetime | None = None
     expirado_el: datetime | None = None
-    prioridad: str | None = None  # Calculada dinámicamente
+    prioridad: str | None = None  # Calculada dinamicamente
 
     class Config:
         from_attributes = True
 
 
 class QRDinamicoSchema(BaseModel):
-    """Schema de QR dinámico"""
+    """Schema de QR dinamico"""
 
     id: int | None = None
     id_mesa: int

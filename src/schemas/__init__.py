@@ -1,13 +1,14 @@
 """
-Módulo de schemas Pydantic para validación de datos.
+Modulo de schemas Pydantic para validacion de datos.
 
-Los schemas están separados por dominio para mejor organización.
+Los schemas estan separados por dominio para mejor organizacion.
 """
 
 # Schemas comunes
-# Schemas de autenticación y usuarios
+# Schemas de autenticacion y usuarios
 from .auth import (
     LoginSchema,
+    ProfileUpdateSchema,
     RegisterSchema,
     RolSchema,
     UsuarioCreateSchema,
@@ -17,8 +18,14 @@ from .auth import (
 )
 from .common import ErrorResponse, PaginatedResponse, PaginationParams, SuccessResponse
 
+# Schemas de favoritos
+from .favorito import FavoritoCreateSchema
+
 # Schemas de locales
 from .local import LocalSchema, MesaSchema, OpinionSchema, ProductoSchema
+
+# Schemas de opiniones
+from .opinion import OpinionCreateSchema
 
 # Schemas de pedidos
 from .pedido import (
@@ -32,6 +39,7 @@ from .pedido import (
 # Schemas de reservas
 from .reserva import (
     QRDinamicoSchema,
+    ReservaCreateInputSchema,
     ReservaCreateSchema,
     ReservaResponseSchema,
     ReservaSchema,
@@ -43,17 +51,21 @@ __all__ = [
     "EncomiendaSchema",
     "ErrorResponse",
     "EstadoPedidoSchema",
+    "FavoritoCreateSchema",
     "LocalSchema",
     "LoginSchema",
     "MesaSchema",
+    "OpinionCreateSchema",
     "OpinionSchema",
     "PaginatedResponse",
     "PaginationParams",
     "PagoSchema",
     "PedidoSchema",
     "ProductoSchema",
+    "ProfileUpdateSchema",
     "QRDinamicoSchema",
     "RegisterSchema",
+    "ReservaCreateInputSchema",
     "ReservaCreateSchema",
     "ReservaResponseSchema",
     "ReservaSchema",

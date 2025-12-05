@@ -1,16 +1,16 @@
-import logging
 import sys
 from pathlib import Path
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
+# Configurar paths primero
 current_dir = Path(__file__).resolve().parent
 sys.path.append(str(current_dir))
 sys.path.append(str(current_dir.parent))
+
+# Configurar logging usando el sistema centralizado
+from config import get_logger, setup_logging  # noqa: E402
+
+setup_logging()
+logger = get_logger(__name__)
 
 try:
     from database import Base, engine

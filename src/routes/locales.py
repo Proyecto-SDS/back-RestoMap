@@ -29,10 +29,15 @@ def obtener_locales():
         locales = (
             db_session.query(Local)
             .options(
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.direccion).joinedload(Direccion.comuna),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.tipo_local),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.horarios),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.fotos).joinedload(Foto.tipo_foto),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.opiniones),
             )
             .all()
@@ -139,11 +144,17 @@ def obtener_local(id):
         local = (
             db_session.query(Local)
             .options(
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.direccion).joinedload(Direccion.comuna),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.tipo_local),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.horarios),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.fotos).joinedload(Foto.tipo_foto),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.opiniones),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Local.redes).joinedload(Redes.tipo_red),
             )
             .filter(Local.id == id)
@@ -331,7 +342,9 @@ def obtener_productos_local(id):
         productos = (
             db_session.query(Producto)
             .options(
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Producto.categoria),
+                # pyrefly: ignore  # bad-argument-type
                 joinedload(Producto.fotos).joinedload(Foto.tipo_foto),
             )
             .filter(Producto.id_local == id)
@@ -409,6 +422,7 @@ def obtener_opiniones_local(id):
 
         opiniones_query = (
             db_session.query(Opinion)
+            # pyrefly: ignore  # bad-argument-type
             .options(joinedload(Opinion.usuario))
             .filter(Opinion.id_local == id, Opinion.eliminado_el.is_(None))
             .order_by(Opinion.creado_el.desc())
@@ -514,6 +528,7 @@ def obtener_reservas_local(id):
         # Obtener reservas del local para esa fecha
         reservas = (
             db_session.query(Reserva)
+            # pyrefly: ignore  # bad-argument-type
             .options(joinedload(Reserva.reservas_mesa).joinedload(ReservaMesa.mesa))
             .filter(
                 Reserva.id_local == id,
@@ -558,6 +573,7 @@ def obtener_horarios_disponibles(id):
         # Verificar que el local existe
         local = (
             db_session.query(Local)
+            # pyrefly: ignore  # bad-argument-type
             .options(joinedload(Local.horarios))
             .filter(Local.id == id)
             .first()

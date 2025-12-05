@@ -1,6 +1,6 @@
-import logging
 from datetime import datetime, timedelta
 
+from config import get_logger
 from models import (
     EstadoReservaEnum,
     QRDinamico,
@@ -8,7 +8,7 @@ from models import (
     ReservaMesa,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_qrs(db):
