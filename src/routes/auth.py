@@ -143,26 +143,38 @@ def login():
         # Formatear teléfono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
 
-        # CASO 1: Usuario Persona (id_local=null, id_rol puede ser null)
+        # CASO 1: Usuario Persona/Cliente (id_local=null, id_rol debería ser "cliente")
         if usuario.id_local is None:
-            # Crear token sin rol ni id_local
-            token = crear_token(usuario.id, None, None)
+            # Obtener el nombre del rol si existe
+            rol_nombre = None
+            if usuario.id_rol:
+                rol_persona = db.execute(
+                    select(Rol).where(Rol.id == usuario.id_rol)
+                ).scalar_one_or_none()
+                rol_nombre = rol_persona.nombre if rol_persona else None
 
-            return jsonify(
-                {
-                    "success": True,
-                    "token": token,
-                    "user": {
-                        "id": str(usuario.id),
-                        "nombre": usuario.nombre,
-                        "correo": usuario.correo,
-                        "telefono": telefono_formateado,
-                        "creado_el": usuario.creado_el.isoformat()
-                        if usuario.creado_el
-                        else None,
-                    },
-                }
-            ), 200
+            # Crear token con rol "cliente" (o el rol que tenga) pero sin id_local
+            token = crear_token(usuario.id, rol_nombre, None)
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "token": token,
+                        "user": {
+                            "id": str(usuario.id),
+                            "nombre": usuario.nombre,
+                            "correo": usuario.correo,
+                            "telefono": telefono_formateado,
+                            "rol": rol_nombre,  # Incluir rol en la respuesta (debería ser "cliente")
+                            "creado_el": usuario.creado_el.isoformat()
+                            if usuario.creado_el
+                            else None,
+                        },
+                    }
+                ),
+                200,
+            )
 
         # CASO 2: Usuario Empleado (tiene id_local y debe tener id_rol)
         # Obtener rol del empleado
@@ -275,15 +287,15 @@ def register():
         # Hash de contraseña con bcrypt
         hashed_password = bcrypt.hashpw(contrasena.encode("utf-8"), bcrypt.gensalt())
 
-        # Obtener rol "usuario" (asumir id=3 basado en seed)
-        rol_usuario = db.execute(
-            select(Rol).where(Rol.nombre == "usuario")
+        # Obtener rol "cliente" para usuarios normales (personas)
+        rol_cliente = db.execute(
+            select(Rol).where(Rol.nombre == "cliente")
         ).scalar_one_or_none()
 
-        # Fallback: usar id 3 si no existe rol_usuario
-        rol_id = 3 if not rol_usuario else rol_usuario.id
+        # Fallback: usar id 6 si no existe rol_cliente (basado en seed: cliente es el 6to rol)
+        rol_id = 6 if not rol_cliente else rol_cliente.id
 
-        # Crear nuevo usuario
+        # Crear nuevo usuario (persona/cliente sin id_local)
         nuevo_usuario = Usuario(
             nombre=nombre,
             correo=correo,

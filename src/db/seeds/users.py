@@ -17,20 +17,20 @@ def create_users(db):
         [
             Usuario(
                 id_rol=1,
-                nombre="Admin Test",
+                nombre="Diego Admin",
                 correo="admin@test.cl",
                 contrasena=password_hash,
                 telefono="912345678",
             ),
             Usuario(
-                id_rol=5,
+                id_rol=6,  # cliente
                 nombre="Juan Pérez",
                 correo="juan@test.cl",
                 contrasena=password_hash,
                 telefono="987654321",
             ),
             Usuario(
-                id_rol=5,
+                id_rol=6,  # cliente
                 nombre="Maria Gonzalez",
                 correo="maria@test.cl",
                 contrasena=password_hash,

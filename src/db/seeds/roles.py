@@ -15,7 +15,7 @@ def create_roles(db):
         [
             Rol(nombre="admin"),
             Rol(nombre="gerente"),
-            Rol(nombre="chef"),
+            Rol(nombre="cocinero"),
             Rol(nombre="mesero"),
             Rol(nombre="bartender"),
             Rol(nombre="cliente"),
