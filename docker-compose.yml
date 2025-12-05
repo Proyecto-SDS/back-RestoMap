@@ -14,7 +14,7 @@ services:
   # ============================================
   db:
     container_name: db-restomap
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     env_file:
       - .env

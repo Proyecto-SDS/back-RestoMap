@@ -4,6 +4,7 @@ Gestiona la conexion, engine y sesiones de SQLAlchemy
 """
 
 import os
+from contextlib import contextmanager
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
@@ -42,7 +43,15 @@ else:
 
 # Crear engine de SQLAlchemy
 # pool_pre_ping=True es vital para evitar desconexiones en la nube
-engine = create_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+# pool_size y max_overflow aumentados para manejar más conexiones
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=30,
+    pool_recycle=3600,  # Reciclar conexiones cada hora
+)
 
 # Crear SessionLocal (factory de sesiones)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -63,5 +72,40 @@ def get_db():
         db.close()
 
 
+def get_session():
+    """
+    Obtener una nueva sesión de base de datos.
+    IMPORTANTE: El llamador debe cerrar la sesión con db.close()
+    """
+    return SessionLocal()
+
+
+@contextmanager
+def get_db_session():
+    """
+    Context manager para obtener una sesión de base de datos.
+    Uso: with get_db_session() as db:
+             db.query(...)
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 # Exponer elementos
-__all__ = ["DATABASE_URL", "Base", "SessionLocal", "db_session", "engine", "get_db"]
+__all__ = [
+    "DATABASE_URL",
+    "Base",
+    "SessionLocal",
+    "db_session",
+    "engine",
+    "get_db",
+    "get_db_session",
+    "get_session",
+]

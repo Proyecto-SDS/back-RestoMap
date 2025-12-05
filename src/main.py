@@ -167,6 +167,7 @@ def _register_blueprints(app: Flask) -> None:
     # Importar blueprints
     from routes import locales_bp
     from routes.auth import auth_bp
+    from routes.empresa import empresa_bp
     from routes.favoritos import favoritos_bp
     from routes.opiniones import opiniones_bp
     from routes.reservas import reservas_bp
@@ -178,6 +179,7 @@ def _register_blueprints(app: Flask) -> None:
         (opiniones_bp, "opiniones"),
         (reservas_bp, "reservas"),
         (favoritos_bp, "favoritos"),
+        (empresa_bp, "empresa"),
     ]
 
     for blueprint, name in blueprints:
@@ -227,6 +229,7 @@ def _register_basic_routes(app: Flask) -> None:
                     "opiniones": "/api/opiniones",
                     "reservas": "/api/reservas",
                     "favoritos": "/api/favoritos",
+                    "empresa": "/api/empresa",
                 },
                 "documentation": "Ver README.md para documentacion completa",
             }

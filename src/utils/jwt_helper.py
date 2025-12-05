@@ -63,6 +63,10 @@ def requerir_auth(f):
     """
     Decorator para proteger rutas que requieren autenticacion
 
+    IMPORTANTE: Este decorator VALIDA que los datos del JWT (id_local, id_rol)
+    coincidan con los datos reales del usuario en la base de datos.
+    Esto previene ataques de manipulacion del JWT.
+
     Usage:
         @app.route('/api/protected')
         @requerir_auth
@@ -72,6 +76,9 @@ def requerir_auth(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        from database import get_db
+        from models.models import Usuario
+
         # Obtener token del header Authorization
         auth_header = request.headers.get("Authorization")
 
@@ -92,9 +99,46 @@ def requerir_auth(f):
         if not payload:
             return jsonify({"error": "Token invalido o expirado"}), 401
 
-        kwargs["user_id"] = payload["user_id"]
-        kwargs["user_rol"] = payload.get("rol")
-        kwargs["id_local"] = payload.get("id_local")
+        user_id = payload["user_id"]
+        jwt_rol = payload.get("rol")
+        jwt_id_local = payload.get("id_local")
+
+        # VALIDACION CONTRA BASE DE DATOS
+        db = next(get_db())
+        try:
+            usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+
+            if not usuario:
+                return jsonify({"error": "Usuario no encontrado"}), 401
+
+            # Obtener rol real desde la base de datos
+            rol_real = usuario.rol.nombre if usuario.rol else None
+            id_local_real = usuario.id_local
+
+            # VALIDAR QUE LOS DATOS DEL JWT COINCIDAN CON LA BD
+            if jwt_rol != rol_real:
+                return jsonify(
+                    {
+                        "error": "Token invalido: el rol ha sido modificado",
+                        "detalle": "Los datos del token no coinciden con la base de datos",
+                    }
+                ), 401
+
+            if jwt_id_local != id_local_real:
+                return jsonify(
+                    {
+                        "error": "Token invalido: el local ha sido modificado",
+                        "detalle": "Los datos del token no coinciden con la base de datos",
+                    }
+                ), 401
+
+            # Usar los valores REALES de la base de datos, no los del JWT
+            kwargs["user_id"] = user_id
+            kwargs["user_rol"] = rol_real
+            kwargs["id_local"] = id_local_real
+
+        finally:
+            db.close()
 
         return f(*args, **kwargs)
 
@@ -106,6 +150,9 @@ def requerir_auth_persona(f):
     Decorator para proteger rutas que SOLO pueden ser accedidas por personas (usuarios normales)
     Bloquea el acceso a empleados (usuarios con id_local)
 
+    IMPORTANTE: Este decorator VALIDA que los datos del JWT (id_local, id_rol)
+    coincidan con los datos reales del usuario en la base de datos.
+
     Usage:
         @app.route('/api/favoritos/')
         @requerir_auth_persona
@@ -115,6 +162,9 @@ def requerir_auth_persona(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        from database import get_db
+        from models.models import Usuario
+
         # Obtener token del header Authorization
         auth_header = request.headers.get("Authorization")
 
@@ -135,17 +185,41 @@ def requerir_auth_persona(f):
         if not payload:
             return jsonify({"error": "Token invalido o expirado"}), 401
 
-        # VERIFICAR QUE SEA PERSONA (sin id_local)
-        id_local = payload.get("id_local")
-        if id_local is not None:
-            return jsonify(
-                {
-                    "error": "Esta funcionalidad solo esta disponible para usuarios normales"
-                }
-            ), 403
+        user_id = payload["user_id"]
+        jwt_id_local = payload.get("id_local")
 
-        # Solo pasar user_id para personas
-        kwargs["user_id"] = payload["user_id"]
+        # VALIDACION CONTRA BASE DE DATOS
+        db = next(get_db())
+        try:
+            usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+
+            if not usuario:
+                return jsonify({"error": "Usuario no encontrado"}), 401
+
+            id_local_real = usuario.id_local
+
+            # VALIDAR QUE EL JWT NO HAYA SIDO MANIPULADO
+            if jwt_id_local != id_local_real:
+                return jsonify(
+                    {
+                        "error": "Token invalido: los datos han sido modificados",
+                        "detalle": "Los datos del token no coinciden con la base de datos",
+                    }
+                ), 401
+
+            # VERIFICAR QUE SEA PERSONA (sin id_local en la BD)
+            if id_local_real is not None:
+                return jsonify(
+                    {
+                        "error": "Esta funcionalidad solo esta disponible para usuarios normales"
+                    }
+                ), 403
+
+            # Solo pasar user_id para personas
+            kwargs["user_id"] = user_id
+
+        finally:
+            db.close()
 
         return f(*args, **kwargs)
 

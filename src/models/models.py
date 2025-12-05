@@ -517,6 +517,9 @@ class Mesa(Base):
     qr_dinamicos = relationship(
         "QRDinamico", back_populates="mesa", lazy="select", cascade="all, delete-orphan"
     )
+    pedidos = relationship(
+        "Pedido", back_populates="mesa", lazy="select", cascade="all, delete-orphan"
+    )
 
 
 # ============================================
@@ -917,7 +920,7 @@ class Pedido(Base):
     actualizado_el = Column(DateTime(timezone=True), onupdate=func.now())
 
     local = relationship("Local", back_populates="pedidos", lazy="joined")
-    mesa = relationship("Mesa", lazy="joined")
+    mesa = relationship("Mesa", back_populates="pedidos", lazy="joined")
     usuario = relationship(
         "Usuario",
         back_populates="pedidos",

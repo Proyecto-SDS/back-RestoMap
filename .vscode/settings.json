@@ -3,6 +3,7 @@
     "**/__pycache__": true,
     "**/*.pyc": true
   },
+  "python.languageServer": "None",
   // Configuracion de Pyrefly Type Checker
   "pyrefly.enabled": true,
   "pyrefly.autocheck": true,

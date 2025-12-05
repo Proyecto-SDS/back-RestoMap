@@ -37,7 +37,7 @@ def create_users(db):
             ),
             Usuario(
                 id_rol=4,
-                id_local=2,
+                id_local=1,
                 nombre="Carlos Mesero",
                 correo="mesero@test.cl",
                 contrasena=password_hash,
@@ -45,7 +45,7 @@ def create_users(db):
             ),
             Usuario(
                 id_rol=3,
-                id_local=2,
+                id_local=1,
                 nombre="Ana Cocinera",
                 correo="cocinero@test.cl",
                 contrasena=password_hash,
@@ -53,7 +53,7 @@ def create_users(db):
             ),
             Usuario(
                 id_rol=5,
-                id_local=2,
+                id_local=1,
                 nombre="Luis Bartender",
                 correo="bartender@test.cl",
                 contrasena=password_hash,
@@ -61,7 +61,7 @@ def create_users(db):
             ),
             Usuario(
                 id_rol=2,
-                id_local=2,
+                id_local=1,
                 nombre="Gabriela Gerente",
                 correo="gerente@test.cl",
                 contrasena=password_hash,

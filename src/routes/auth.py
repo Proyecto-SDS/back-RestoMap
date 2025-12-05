@@ -297,7 +297,7 @@ def register(data: RegisterSchema):
 
 @auth_bp.route("/logout", methods=["POST"])
 @requerir_auth
-def logout(_user_id=None, _user_rol=None, _id_local=None):
+def logout(user_id=None, user_rol=None, id_local=None):  # noqa: ARG001
     """
     Cerrar sesion (actualmente solo responde exitosamente)
 

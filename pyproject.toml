@@ -89,6 +89,7 @@ ignore = [
     "PLR0915", # Too many statements
     "C901",    # Complex function
     "PLC0415", # Import outside top-level
+    "ARG001",  # Too many arguments
 ]
 
 fixable = ["ALL"]
