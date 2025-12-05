@@ -20,14 +20,14 @@ from models import (
 )
 from models.models import EstadoReservaEnum
 from services.qr_service import crear_qr_reserva, generar_qr_imagen
-from utils.jwt_helper import requerir_auth
+from utils.jwt_helper import requerir_auth_persona
 
 reservas_bp = Blueprint("reservas", __name__, url_prefix="/api/reservas")
 
 
 @reservas_bp.route("/", methods=["POST"])
-@requerir_auth
-def crear_reserva(user_id, _user_rol):
+@requerir_auth_persona
+def crear_reserva(user_id):
     """
     Crear nueva reserva para un local
 
@@ -252,8 +252,8 @@ def crear_reserva(user_id, _user_rol):
 
 
 @reservas_bp.route("/mis-reservas", methods=["GET"])
-@requerir_auth
-def obtener_mis_reservas(user_id, _user_rol):
+@requerir_auth_persona
+def obtener_mis_reservas(user_id):
     """
     Obtener todas las reservas del usuario autenticado
 

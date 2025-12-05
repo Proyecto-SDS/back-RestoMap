@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
 from database import SessionLocal
-from models.models import Rol, Usuario
+from models.models import Local, Rol, Usuario
 from utils.jwt_helper import crear_token, requerir_auth
 
 logger = logging.getLogger(__name__)
@@ -33,13 +33,17 @@ def login():
     """
     Iniciar sesion con correo y contraseña
 
+    Detecta automáticamente si es persona o empleado:
+    - Persona: rol=null, id_local=null
+    - Empleado: rol y id_local presentes
+
     Body:
         {
             "correo": "usuario@example.com",
             "contrasena": "password123"
         }
 
-    Response 200:
+    Response 200 (Persona):
         {
             "success": true,
             "token": "eyJhbGc...",
@@ -48,25 +52,52 @@ def login():
                 "nombre": "Juan Pérez",
                 "correo": "usuario@example.com",
                 "telefono": "+56912345678",
-                "rol": "usuario",
+                "creado_el": "2024-01-01T12:00:00"
+            }
+        }
+
+    Response 200 (Empleado):
+        {
+            "success": true,
+            "token": "eyJhbGc...",
+            "user": {
+                "id": "2",
+                "nombre": "María Mesera",
+                "correo": "mesero@test.cl",
+                "telefono": "+56912345678",
+                "rol": "mesero",
+                "id_local": 1,
+                "nombre_local": "RestoMap Central",
                 "creado_el": "2024-01-01T12:00:00"
             }
         }
 
     Response 400:
         {"error": "Correo y contraseña son requeridos"}
+        {"error": "Cuenta de empleado sin local asignado"}
+        {"error": "Cuenta de empleado sin rol asignado"}
 
     Response 401:
         {"error": "Correo o contraseña incorrectos"}
+
+    Response 404:
+        {"error": "Local no encontrado"}
     """
     try:
         data = request.get_json()
 
         correo = data.get("correo", "").strip().lower()
         contrasena = data.get("contrasena", "")
+        tipo_login = data.get(
+            "tipo_login", "persona"
+        )  # Default a persona para retrocompatibilidad
 
         if not correo or not contrasena:
             return jsonify({"error": "Correo y contraseña son requeridos"}), 400
+
+        # Validar tipo_login
+        if tipo_login not in ["persona", "empresa"]:
+            return jsonify({"error": "tipo_login debe ser 'persona' o 'empresa'"}), 400
 
         db = next(get_db())
 
@@ -84,20 +115,83 @@ def login():
         ):
             return jsonify({"error": "Correo o contraseña incorrectos"}), 401
 
-        # Obtener rol
-        rol = db.execute(
-            select(Rol).where(Rol.id == usuario.id_rol)
-        ).scalar_one_or_none()
+        # VALIDACIÓN: Verificar que el tipo de login coincida con el tipo de cuenta
+        es_empleado = usuario.id_local is not None
 
-        rol_nombre = rol.nombre if rol else "usuario"
+        if tipo_login == "persona" and es_empleado:
+            return jsonify(
+                {
+                    "error": "Esta es una cuenta de empleado. Por favor usa el tab 'Empresa' para iniciar sesión"
+                }
+            ), 400
 
-        # Crear token JWT
-        token = crear_token(usuario.id, rol_nombre)
+        if tipo_login == "empresa" and not es_empleado:
+            return jsonify(
+                {
+                    "error": "Esta es una cuenta de persona. Por favor usa el tab 'Persona' para iniciar sesión"
+                }
+            ), 400
+
+        # VALIDACIÓN: Verificar coherencia de datos
+        # Si tiene id_local, DEBE tener id_rol (empleado)
+        if usuario.id_local is not None and usuario.id_rol is None:
+            logger.error(
+                f"Usuario {usuario.id} tiene id_local pero no id_rol (datos inconsistentes)"
+            )
+            return jsonify({"error": "Cuenta de empleado sin rol asignado"}), 400
 
         # Formatear teléfono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
 
-        # Respuesta exitosa
+        # CASO 1: Usuario Persona (id_local=null, id_rol puede ser null)
+        if usuario.id_local is None:
+            # Crear token sin rol ni id_local
+            token = crear_token(usuario.id, None, None)
+
+            return jsonify(
+                {
+                    "success": True,
+                    "token": token,
+                    "user": {
+                        "id": str(usuario.id),
+                        "nombre": usuario.nombre,
+                        "correo": usuario.correo,
+                        "telefono": telefono_formateado,
+                        "creado_el": usuario.creado_el.isoformat()
+                        if usuario.creado_el
+                        else None,
+                    },
+                }
+            ), 200
+
+        # CASO 2: Usuario Empleado (tiene id_local y debe tener id_rol)
+        # Obtener rol del empleado
+        rol = db.execute(
+            select(Rol).where(Rol.id == usuario.id_rol)
+        ).scalar_one_or_none()
+
+        if not rol:
+            logger.error(
+                f"Usuario {usuario.id} tiene id_rol={usuario.id_rol} pero el rol no existe"
+            )
+            return jsonify({"error": "Rol de empleado no encontrado"}), 404
+
+        rol_nombre = rol.nombre
+
+        # Obtener información del Local (VERIFICAR EN BD antes de crear token)
+        local = db.execute(
+            select(Local).where(Local.id == usuario.id_local)
+        ).scalar_one_or_none()
+
+        if not local:
+            logger.error(
+                f"Usuario {usuario.id} tiene id_local={usuario.id_local} pero el local no existe"
+            )
+            return jsonify({"error": "Local no encontrado"}), 404
+
+        # Crear token CON rol y id_local (empleado verificado)
+        token = crear_token(usuario.id, rol_nombre, usuario.id_local)
+
         return jsonify(
             {
                 "success": True,
@@ -108,6 +202,8 @@ def login():
                     "correo": usuario.correo,
                     "telefono": telefono_formateado,
                     "rol": rol_nombre,
+                    "id_local": usuario.id_local,
+                    "nombre_local": local.nombre,
                     "creado_el": usuario.creado_el.isoformat()
                     if usuario.creado_el
                     else None,
@@ -210,7 +306,7 @@ def register():
 
 @auth_bp.route("/logout", methods=["POST"])
 @requerir_auth
-def logout(_user_id, _user_rol):
+def logout(user_id=None, user_rol=None, id_local=None):
     """
     Cerrar sesion (actualmente solo responde exitosamente)
 

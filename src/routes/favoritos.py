@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from database import SessionLocal
 from models.models import Favorito, Local
-from utils.jwt_helper import requerir_auth
+from utils.jwt_helper import requerir_auth_persona
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ def get_db():
 
 
 @favoritos_bp.route("/", methods=["GET"])
-@requerir_auth
-def get_favoritos(user_id, _user_rol):
+@requerir_auth_persona
+def get_favoritos(user_id):
     """
     Obtener lista de favoritos del usuario autenticado
 
@@ -83,8 +83,8 @@ def get_favoritos(user_id, _user_rol):
 
 
 @favoritos_bp.route("/", methods=["POST"])
-@requerir_auth
-def add_favorito(user_id, _user_rol):
+@requerir_auth_persona
+def add_favorito(user_id):
     """
     Agregar un local a favoritos
 
@@ -172,8 +172,8 @@ def add_favorito(user_id, _user_rol):
 
 
 @favoritos_bp.route("/<int:local_id>", methods=["DELETE"])
-@requerir_auth
-def remove_favorito(user_id, _user_rol, local_id):
+@requerir_auth_persona
+def remove_favorito(user_id, local_id):
     """
     Quitar un local de favoritos
 
@@ -216,8 +216,8 @@ def remove_favorito(user_id, _user_rol, local_id):
 
 
 @favoritos_bp.route("/check/<int:local_id>", methods=["GET"])
-@requerir_auth
-def check_favorito(user_id, _user_rol, local_id):
+@requerir_auth_persona
+def check_favorito(user_id, local_id):
     """
     Verificar si un local es favorito
 

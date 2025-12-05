@@ -11,14 +11,14 @@ from sqlalchemy.orm import joinedload
 
 from database import db_session
 from models import Local, Opinion, Usuario
-from utils.jwt_helper import requerir_auth
+from utils.jwt_helper import requerir_auth_persona
 
 opiniones_bp = Blueprint("opiniones", __name__, url_prefix="/api/opiniones")
 
 
 @opiniones_bp.route("/", methods=["POST"])
-@requerir_auth
-def crear_opinion(user_id, _user_rol):
+@requerir_auth_persona
+def crear_opinion(user_id):
     """
     Crear nueva opinion para un local
 
@@ -147,8 +147,8 @@ def crear_opinion(user_id, _user_rol):
 
 
 @opiniones_bp.route("/mis-opiniones", methods=["GET"])
-@requerir_auth
-def obtener_mis_opiniones(user_id, _user_rol):
+@requerir_auth_persona
+def obtener_mis_opiniones(user_id):
     """
     Obtener todas las opiniones del usuario autenticado
 
@@ -202,8 +202,8 @@ def obtener_mis_opiniones(user_id, _user_rol):
 
 
 @opiniones_bp.route("/<int:local_id>/user", methods=["GET"])
-@requerir_auth
-def obtener_opinion_usuario(local_id, user_id, _user_rol):
+@requerir_auth_persona
+def obtener_opinion_usuario(local_id, user_id):
     """
     Obtener la opinion del usuario autenticado para un local especifico
 
