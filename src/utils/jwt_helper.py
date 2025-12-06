@@ -147,8 +147,10 @@ def requerir_auth(f):
 
 def requerir_auth_persona(f):
     """
-    Decorator para proteger rutas que SOLO pueden ser accedidas por personas (usuarios normales)
-    Bloquea el acceso a empleados (usuarios con id_local)
+    Decorator para proteger rutas que requieren autenticacion de usuario.
+
+    Todos los usuarios registrados son clientes, independientemente de si
+    tienen un rol de empleado (gerente, mesero, chef, etc.).
 
     IMPORTANTE: Este decorator VALIDA que los datos del JWT (id_local, id_rol)
     coincidan con los datos reales del usuario en la base de datos.
@@ -207,15 +209,8 @@ def requerir_auth_persona(f):
                     }
                 ), 401
 
-            # VERIFICAR QUE SEA PERSONA (sin id_local en la BD)
-            if id_local_real is not None:
-                return jsonify(
-                    {
-                        "error": "Esta funcionalidad solo esta disponible para usuarios normales"
-                    }
-                ), 403
-
-            # Solo pasar user_id para personas
+            # Todos los usuarios registrados son clientes (con o sin rol de empleado)
+            # Solo pasar user_id
             kwargs["user_id"] = user_id
 
         finally:

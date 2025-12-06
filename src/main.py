@@ -169,6 +169,7 @@ def _register_blueprints(app: Flask) -> None:
     from routes.auth import auth_bp
     from routes.empresa import empresa_bp
     from routes.favoritos import favoritos_bp
+    from routes.invitaciones import invitaciones_bp
     from routes.opiniones import opiniones_bp
     from routes.reservas import reservas_bp
 
@@ -180,6 +181,7 @@ def _register_blueprints(app: Flask) -> None:
         (reservas_bp, "reservas"),
         (favoritos_bp, "favoritos"),
         (empresa_bp, "empresa"),
+        (invitaciones_bp, "invitaciones"),
     ]
 
     for blueprint, name in blueprints:

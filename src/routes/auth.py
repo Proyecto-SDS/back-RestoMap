@@ -128,9 +128,10 @@ def login(data: LoginSchema):
         # Formatear telefono
         telefono_formateado = f"+56{usuario.telefono}" if usuario.telefono else None
 
-        # CASO 1: Usuario Persona/Cliente (id_local=null, id_rol deberia ser "cliente")
+        # CASO 1: Usuario Persona/Cliente (id_local=null, id_rol=null)
         if usuario.id_local is None:
-            # Obtener el nombre del rol si existe
+            # Los clientes tienen id_rol=None
+            # Solo verificamos por si acaso hay algun usuario legacy con id_rol
             rol_nombre = None
             if usuario.id_rol:
                 rol_persona = db.execute(
@@ -138,24 +139,30 @@ def login(data: LoginSchema):
                 ).scalar_one_or_none()
                 rol_nombre = rol_persona.nombre if rol_persona else None
 
-            # Crear token con rol "cliente" (o el rol que tenga) pero sin id_local
+            # Crear token con rol=None para clientes (sin id_local)
             token = crear_token(usuario.id, rol_nombre, None)
+
+            # Preparar respuesta de usuario (cliente)
+            user_data = {
+                "id": str(usuario.id),
+                "nombre": usuario.nombre,
+                "correo": usuario.correo,
+                "telefono": telefono_formateado,
+                "creado_el": usuario.creado_el.isoformat()
+                if usuario.creado_el
+                else None,
+            }
+
+            # Solo incluir rol si existe (para usuarios legacy)
+            if rol_nombre:
+                user_data["rol"] = rol_nombre
 
             return (
                 jsonify(
                     {
                         "success": True,
                         "token": token,
-                        "user": {
-                            "id": str(usuario.id),
-                            "nombre": usuario.nombre,
-                            "correo": usuario.correo,
-                            "telefono": telefono_formateado,
-                            "rol": rol_nombre,  # Incluir rol en la respuesta (deberia ser "cliente")
-                            "creado_el": usuario.creado_el.isoformat()
-                            if usuario.creado_el
-                            else None,
-                        },
+                        "user": user_data,
                     }
                 ),
                 200,
@@ -256,21 +263,17 @@ def register(data: RegisterSchema):
         # Hash de contrasena con bcrypt
         hashed_password = bcrypt.hashpw(contrasena.encode("utf-8"), bcrypt.gensalt())
 
-        # Obtener rol "cliente" para usuarios normales (personas)
-        rol_cliente = db.execute(
-            select(Rol).where(Rol.nombre == "cliente")
-        ).scalar_one_or_none()
+        # Los usuarios normales (clientes) tienen id_rol=None y id_local=None
+        # Solo los empleados tienen id_rol y id_local asignados
 
-        # Fallback: usar id 6 si no existe rol_cliente (basado en seed: cliente es el 6to rol)
-        rol_id = 6 if not rol_cliente else rol_cliente.id
-
-        # Crear nuevo usuario (persona/cliente sin id_local)
+        # Crear nuevo usuario (persona/cliente sin id_local ni id_rol)
         nuevo_usuario = Usuario(
             nombre=nombre,
             correo=correo,
             contrasena=hashed_password.decode("utf-8"),
             telefono=int(telefono_limpio),
-            id_rol=rol_id,
+            id_rol=None,  # Los clientes no tienen rol asignado
+            id_local=None,  # Los clientes no pertenecen a un local
             terminos_aceptados=True,
             fecha_aceptacion_terminos=datetime.now(),
         )

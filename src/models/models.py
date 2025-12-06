@@ -615,6 +615,75 @@ class Usuario(Base):
 
 
 # ============================================
+# SISTEMA DE INVITACIONES
+# ============================================
+
+
+class EstadoInvitacionEnum(str, PyEnum):
+    """Estados de una invitación de empleado"""
+
+    PENDIENTE = "pendiente"
+    ACEPTADA = "aceptada"
+    RECHAZADA = "rechazada"
+    EXPIRADA = "expirada"
+
+    @classmethod
+    def choices(cls) -> list[tuple]:
+        return [
+            (cls.PENDIENTE, "Pendiente"),
+            (cls.ACEPTADA, "Aceptada"),
+            (cls.RECHAZADA, "Rechazada"),
+            (cls.EXPIRADA, "Expirada"),
+        ]
+
+
+class InvitacionEmpleado(Base):
+    """
+    Tabla para invitaciones de empleados a locales.
+
+    Flujo:
+    1. Gerente crea invitación con correo y rol
+    2. Se envía email al usuario con token único
+    3. Usuario acepta/rechaza la invitación
+    4. Al aceptar, se convierte en empleado del local
+    """
+
+    __tablename__ = "invitacion_empleado"
+
+    id = Column(Integer, primary_key=True, index=True)
+    id_local = Column(
+        Integer, ForeignKey("local.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    id_rol = Column(
+        Integer, ForeignKey("rol.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    invitado_por = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    correo = Column(String(100), nullable=False, index=True)
+    token = Column(String(100), unique=True, nullable=False, index=True)
+    estado = Column(
+        Enum(EstadoInvitacionEnum, name="estado_invitacion_enum"),
+        nullable=False,
+        default=EstadoInvitacionEnum.PENDIENTE,
+    )
+    creado_el = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expira_el = Column(DateTime(timezone=True), nullable=False)
+    aceptado_el = Column(DateTime(timezone=True), nullable=True)
+    rechazado_el = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    local = relationship("Local", lazy="joined")
+    rol = relationship("Rol", lazy="joined")
+    invitador = relationship("Usuario", lazy="joined", foreign_keys=[invitado_por])
+
+
+# ============================================
 # CONTENIDO MULTIMEDIA
 # ============================================
 
