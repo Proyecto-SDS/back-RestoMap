@@ -142,3 +142,5 @@ instance/
 docs/_build/
 target/
 .pybuilder/
+
+alembic/versions/
