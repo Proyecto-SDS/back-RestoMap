@@ -13,7 +13,7 @@ src_dir = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 # Configurar logging usando el sistema centralizado
-from config import get_logger, setup_logging  # noqa: E402
+from config import get_logger, setup_logging
 
 setup_logging()
 logger = get_logger(__name__)

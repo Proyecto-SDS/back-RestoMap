@@ -7,7 +7,7 @@ sys.path.append(str(current_dir))
 sys.path.append(str(current_dir.parent))
 
 # Configurar logging usando el sistema centralizado
-from config import get_logger, setup_logging  # noqa: E402
+from config import get_logger, setup_logging
 
 setup_logging()
 logger = get_logger(__name__)

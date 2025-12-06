@@ -63,6 +63,8 @@ def create_locals(db):
     # ============ Locales ============
     logger.info("  → Insertando Locales de ejemplo...")
     if db.query(Local).count() == 0:
+        from datetime import datetime
+
         local1 = Local(
             id_direccion=1,
             id_tipo_local=1,
@@ -70,6 +72,12 @@ def create_locals(db):
             descripcion="Restaurante de comida chilena tradicional con ambiente familiar. Especialidad en platos tipicos y carnes a la parrilla.",
             telefono=123456789,
             correo="contacto@gransabor.cl",
+            rut_empresa="76123456-7",
+            razon_social="RESTAURANTE EL GRAN SABOR SPA",
+            glosa_giro="RESTAURANTES, BARES Y CANTINAS",
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+            version_terminos="v1.0",
         )
         local2 = Local(
             id_direccion=2,
@@ -78,6 +86,12 @@ def create_locals(db):
             descripcion="Bar con terraza al aire libre, ideal para después de la oficina. Amplia carta de cervezas artesanales y cocteles.",
             telefono=987654321,
             correo="reservas@laterraza.cl",
+            rut_empresa="76234567-8",
+            razon_social="BAR LA TERRAZA LTDA",
+            glosa_giro="BARES, PUBS Y DISCOTECAS",
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+            version_terminos="v1.0",
         )
         local3 = Local(
             id_direccion=3,
@@ -86,6 +100,12 @@ def create_locals(db):
             descripcion="Restobar moderno con música en vivo los fines de semana. Fusion de cocina internacional y bar de tragos premium.",
             telefono=555666777,
             correo="info@restobarparque.com",
+            rut_empresa="76345678-9",
+            razon_social="RESTOBAR DEL PARQUE SPA",
+            glosa_giro="RESTAURANTES, BARES Y CANTINAS",
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+            version_terminos="v1.0",
         )
         local4 = Local(
             id_direccion=4,
@@ -94,6 +114,12 @@ def create_locals(db):
             descripcion="Auténtica comida peruana en el corazon de Santiago. Especialidad en ceviches, tiraditos y causas limeñas.",
             telefono=111222333,
             correo="contacto@rinconperuano.cl",
+            rut_empresa="76456789-0",
+            razon_social="RINCON PERUANO EIRL",
+            glosa_giro="RESTAURANTES, BARES Y CANTINAS",
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+            version_terminos="v1.0",
         )
         local5 = Local(
             id_direccion=5,
@@ -102,6 +128,12 @@ def create_locals(db):
             descripcion="Pub estilo inglés con ambiente acogedor. Amplia seleccion de cervezas importadas y comida de pub clasica.",
             telefono=444555666,
             correo="contact@theoldpub.com",
+            rut_empresa="76567890-1",
+            razon_social="THE OLD PUB LTDA",
+            glosa_giro="BARES, PUBS Y DISCOTECAS",
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+            version_terminos="v1.0",
         )
         db.add_all([local1, local2, local3, local4, local5])
         db.commit()

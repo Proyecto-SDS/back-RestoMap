@@ -277,17 +277,20 @@ def obtener_etiqueta(enum_class, valor: str) -> str:
 
 
 def obtener_prioridad_reserva(
-    fecha_reserva: date | Column[date], hora_reserva: time | Column[time]
-) -> str:
+    fecha_reserva: date | Column[date] | None, hora_reserva: time | Column[time] | None
+) -> str | None:
     """
-    Calcula DINÁMICAMENTE la prioridad de una reserva según cercanía a la hora actual.
+    Calcula DINAMICAMENTE la prioridad de una reserva segun cercania a la hora actual.
 
     - ALTA: Dentro de 2 horas
     - MEDIA: Dentro de 24 horas
-    - BAJA: Más de 24 horas
+    - BAJA: Mas de 24 horas
 
     Esta es la forma correcta de hacerlo (no como campo en BD)
     """
+    if fecha_reserva is None or hora_reserva is None:
+        return None
+
     from datetime import datetime
 
     ahora = datetime.now()
@@ -441,6 +444,14 @@ class Local(Base):
     telefono = Column(Integer, nullable=False)
     correo = Column(String(50), nullable=False, unique=True, index=True)
 
+    # Campos para registro de empresa
+    rut_empresa = Column(String(12), unique=True, nullable=True, index=True)
+    razon_social = Column(String(200), nullable=True)
+    glosa_giro = Column(String(200), nullable=True)
+    terminos_aceptados = Column(Boolean, nullable=False, default=False)
+    fecha_aceptacion_terminos = Column(DateTime(timezone=True), nullable=True)
+    version_terminos = Column(String(20), nullable=True)
+
     horarios = relationship(
         "Horario", back_populates="local", lazy="select", cascade="all, delete-orphan"
     )
@@ -544,6 +555,17 @@ class Usuario(Base):
     creado_el = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
+
+    # Campos para sistema de invitación de empleados
+    invitado_por = Column(
+        Integer, ForeignKey("usuario.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Campos para términos y políticas
+    terminos_aceptados = Column(Boolean, nullable=False, default=False)
+    fecha_aceptacion_terminos = Column(DateTime(timezone=True), nullable=True)
+    politicas_uso_aceptadas = Column(Boolean, nullable=False, default=False)
+    fecha_aceptacion_politicas = Column(DateTime(timezone=True), nullable=True)
 
     rol = relationship("Rol", back_populates="usuarios", lazy="joined")
     local = relationship("Local", lazy="joined", foreign_keys=[id_local])
@@ -795,8 +817,8 @@ class Reserva(Base):
     )
 
     @property
-    def prioridad(self) -> str:
-        """Propiedad que calcula la prioridad dinámicamente"""
+    def prioridad(self) -> str | None:
+        """Propiedad que calcula la prioridad dinamicamente"""
         return obtener_prioridad_reserva(self.fecha_reserva, self.hora_reserva)
 
 

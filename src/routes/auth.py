@@ -4,6 +4,9 @@ Endpoints: /api/auth/*
 """
 
 # pyrefly: ignore [missing-import]
+import contextlib
+from datetime import datetime
+
 import bcrypt
 from flask import Blueprint, jsonify
 from pydantic import ValidationError
@@ -11,8 +14,14 @@ from sqlalchemy import select
 
 from config import get_logger
 from database import SessionLocal
-from models.models import Local, Rol, Usuario
+from models.models import Direccion, Local, Rol, Usuario
 from schemas import LoginSchema, ProfileUpdateSchema, RegisterSchema
+from schemas.auth import RegisterEmpresaSchema
+from services.rut_service import (
+    consultar_rut_sii,
+    validar_digito_verificador,
+    validar_formato_rut,
+)
 from utils.jwt_helper import crear_token, requerir_auth
 from utils.validation import validate_json
 
@@ -279,6 +288,8 @@ def register(data: RegisterSchema):
             contrasena=hashed_password.decode("utf-8"),
             telefono=int(telefono_limpio),
             id_rol=rol_id,
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
         )
 
         db.add(nuevo_usuario)
@@ -297,7 +308,7 @@ def register(data: RegisterSchema):
 
 @auth_bp.route("/logout", methods=["POST"])
 @requerir_auth
-def logout(user_id=None, user_rol=None, id_local=None):  # noqa: ARG001
+def logout(user_id=None, user_rol=None, id_local=None):
     """
     Cerrar sesion (actualmente solo responde exitosamente)
 
@@ -446,4 +457,216 @@ def update_profile(data: ProfileUpdateSchema, user_id, user_rol):
 
     except Exception as e:
         logger.error(f"Error en update_profile: {e!s}")
+        return jsonify({"error": "Error al procesar la solicitud"}), 500
+
+
+@auth_bp.route("/validar-rut/<rut>", methods=["GET"])
+def validar_rut(rut: str):
+    """
+    Valida un RUT de empresa y retorna su informacion del SII.
+
+    GET /api/auth/validar-rut/76.883.241-2
+
+    Response 200:
+        {
+            "valido": true,
+            "existe": true,
+            "razon_social": "EMPRESA XYZ SPA",
+            "glosa_giro": "RESTAURANTES, BARES Y CANTINAS"
+        }
+
+    Response 400:
+        {"error": "Formato de RUT invalido"}
+        {"error": "Digito verificador incorrecto"}
+
+    Response 404:
+        {"error": "RUT no encontrado en el SII"}
+    """
+    try:
+        # Validar formato
+        if not validar_formato_rut(rut):
+            return jsonify(
+                {"error": "Formato de RUT invalido. Use formato XX.XXX.XXX-X"}
+            ), 400
+
+        # Validar digito verificador
+        if not validar_digito_verificador(rut):
+            return jsonify({"error": "Digito verificador incorrecto"}), 400
+
+        # Consultar API sre.cl
+        resultado = consultar_rut_sii(rut)
+
+        if not resultado["valido"]:
+            return jsonify({"error": resultado["error"]}), 400
+
+        if not resultado["existe"]:
+            return jsonify({"error": "RUT no encontrado en el SII"}), 404
+
+        return jsonify(
+            {
+                "valido": True,
+                "existe": True,
+                "razon_social": resultado["razon_social"],
+                "glosa_giro": resultado["glosa_giro"],
+            }
+        ), 200
+
+    except Exception as e:
+        logger.error(f"Error en validar_rut: {e!s}")
+        return jsonify({"error": "Error al validar el RUT"}), 500
+
+
+@auth_bp.route("/register-empresa", methods=["POST"])
+@validate_json(RegisterEmpresaSchema)
+def register_empresa(data: RegisterEmpresaSchema):
+    """
+    Registra una nueva empresa con su usuario gerente.
+    Crea atomicamente: Direccion + Local + Usuario (gerente).
+
+    POST /api/auth/register-empresa
+
+    Body:
+        {
+            "rut_empresa": "76.883.241-2",
+            "razon_social": "EMPRESA XYZ SPA",
+            "nombre_local": "Restaurante XYZ",
+            "telefono_local": "912345678",
+            "correo_local": "contacto@xyz.cl",
+            "descripcion": "Descripcion del local",
+            "id_tipo_local": 1,
+            "calle": "Av. Principal",
+            "numero": 123,
+            "id_comuna": 1,
+            "nombre_gerente": "Juan Perez",
+            "correo_gerente": "gerente@xyz.cl",
+            "telefono_gerente": "987654321",
+            "contrasena": "password123",
+            "acepta_terminos": true
+        }
+
+    Response 201:
+        {
+            "success": true,
+            "message": "Empresa registrada exitosamente",
+            "local_id": 1
+        }
+
+    Response 400:
+        {"error": "RUT ya registrado"}
+        {"error": "Correo de local ya registrado"}
+        {"error": "Correo de gerente ya registrado"}
+    """
+    db = None
+    try:
+        db = next(get_db())
+
+        # 1. Verificar que el RUT no este registrado
+        local_existente = db.execute(
+            select(Local).where(Local.rut_empresa == data.rut_empresa)
+        ).scalar_one_or_none()
+
+        if local_existente:
+            return jsonify({"error": "Este RUT ya esta registrado"}), 400
+
+        # 2. Verificar correo del local
+        correo_local_existente = db.execute(
+            select(Local).where(Local.correo == data.correo_local.lower())
+        ).scalar_one_or_none()
+
+        if correo_local_existente:
+            return jsonify({"error": "El correo del local ya esta registrado"}), 400
+
+        # 3. Verificar correo del gerente
+        correo_gerente_existente = db.execute(
+            select(Usuario).where(Usuario.correo == data.correo_gerente.lower())
+        ).scalar_one_or_none()
+
+        if correo_gerente_existente:
+            return jsonify({"error": "El correo del gerente ya esta registrado"}), 400
+
+        # 4. Validar RUT con API (debe existir en SII)
+        resultado_rut = consultar_rut_sii(data.rut_empresa)
+        if not resultado_rut["existe"]:
+            return jsonify(
+                {
+                    "error": "RUT no encontrado en el SII. Solo empresas registradas pueden usar la plataforma."
+                }
+            ), 400
+
+        # 5. Crear Direccion
+        nueva_direccion = Direccion(
+            id_comuna=data.id_comuna,
+            calle=data.calle,
+            numero=data.numero,
+            longitud=-70.64827,  # Coordenadas por defecto (Santiago centro)
+            latitud=-33.45694,
+        )
+        db.add(nueva_direccion)
+        db.flush()  # Obtener ID sin commit
+
+        # 6. Crear Local
+        nuevo_local = Local(
+            id_direccion=nueva_direccion.id,
+            id_tipo_local=data.id_tipo_local,
+            nombre=data.nombre_local,
+            descripcion=data.descripcion,
+            telefono=int(data.telefono_local),
+            correo=data.correo_local.lower(),
+            rut_empresa=data.rut_empresa,
+            razon_social=data.razon_social,
+            glosa_giro=resultado_rut.get("glosa_giro"),
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+            version_terminos="v1.0",
+        )
+        db.add(nuevo_local)
+        db.flush()  # Obtener ID sin commit
+
+        # 7. Obtener rol "gerente"
+        rol_gerente = db.execute(
+            select(Rol).where(Rol.nombre == "gerente")
+        ).scalar_one_or_none()
+
+        rol_id = 2 if not rol_gerente else rol_gerente.id
+
+        # 8. Hash de contrasena
+        hashed_password = bcrypt.hashpw(
+            data.contrasena.encode("utf-8"), bcrypt.gensalt()
+        )
+
+        # 9. Crear Usuario Gerente
+        nuevo_usuario = Usuario(
+            id_rol=rol_id,
+            id_local=nuevo_local.id,
+            nombre=data.nombre_gerente,
+            correo=data.correo_gerente.lower(),
+            contrasena=hashed_password.decode("utf-8"),
+            telefono=int(data.telefono_gerente),
+            terminos_aceptados=True,
+            fecha_aceptacion_terminos=datetime.now(),
+        )
+        db.add(nuevo_usuario)
+
+        # 10. Commit atomico
+        db.commit()
+
+        logger.info(
+            f"Empresa registrada: {data.razon_social} (Local ID: {nuevo_local.id})"
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "Empresa registrada exitosamente",
+                "local_id": nuevo_local.id,
+            }
+        ), 201
+
+    except ValidationError as e:
+        return jsonify({"error": "Datos invalidos", "details": e.errors()}), 400
+    except Exception as e:
+        logger.error(f"Error en register_empresa: {e!s}")
+        if db is not None:
+            with contextlib.suppress(Exception):
+                db.rollback()
         return jsonify({"error": "Error al procesar la solicitud"}), 500
