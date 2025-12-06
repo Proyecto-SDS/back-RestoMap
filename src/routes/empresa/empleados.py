@@ -170,7 +170,12 @@ def cambiar_estado_empleado(empleado_id, user_id, user_rol, id_local):
 @requerir_empleado
 @requerir_roles_empresa("gerente")
 def eliminar_empleado(empleado_id, user_id, user_rol, id_local):
-    """Eliminar un empleado"""
+    """
+    Despedir un empleado (remover del local).
+
+    No elimina al usuario de la base de datos, solo le quita el rol y el local
+    para que pueda seguir usando su cuenta como cliente.
+    """
     db = get_session()
     try:
         stmt = select(Usuario).where(
@@ -184,10 +189,12 @@ def eliminar_empleado(empleado_id, user_id, user_rol, id_local):
         if empleado.id == user_id:
             return jsonify({"error": "No puedes eliminarte a ti mismo"}), 400
 
-        db.delete(empleado)
+        # En lugar de eliminar, removemos el rol y local del empleado
+        empleado.id_rol = None
+        empleado.id_local = None
         db.commit()
 
-        return jsonify({"message": "Empleado eliminado exitosamente"}), 200
+        return jsonify({"message": "Empleado removido del local exitosamente"}), 200
     finally:
         db.close()
 
