@@ -1,8 +1,9 @@
 """
 Servicio de validacion de RUT chileno.
-Incluye validacion de formato y consulta a API sre.cl
+Incluye validacion de formato y consulta a API SimpleAPI.cl
 """
 
+import os
 import re
 
 import requests
@@ -11,9 +12,9 @@ from config import get_logger
 
 logger = get_logger(__name__)
 
-# Configuracion API sre.cl
-SRE_API_URL = "https://sre.cl/api/company_info"
-SRE_TOKEN = "token_publico"  # 200 consultas/dia gratis
+# Configuracion API SimpleAPI.cl v2
+SIMPLEAPI_URL = "https://rut.simpleapi.cl/v2"
+SIMPLEAPI_KEY = os.getenv("SIMPLEAPI_KEY", "")
 
 
 def limpiar_rut(rut: str) -> str:
@@ -86,10 +87,10 @@ def validar_digito_verificador(rut: str) -> bool:
 
 def consultar_rut_sii(rut: str) -> dict:
     """
-    Consulta la API sre.cl para obtener informacion de una empresa.
+    Consulta la API SimpleAPI.cl v2 para obtener informacion de un contribuyente.
 
     Args:
-        rut: RUT de la empresa (con o sin puntos)
+        rut: RUT del contribuyente (con o sin puntos)
 
     Returns:
         dict con:
@@ -120,17 +121,59 @@ def consultar_rut_sii(rut: str) -> dict:
             "error": "Digito verificador incorrecto",
         }
 
-    try:
-        # Consultar API sre.cl
-        payload = {"token": SRE_TOKEN, "rut": rut_limpio, "version": "2.0"}
+    # Si no hay API Key configurada, solo validar formato localmente
+    if not SIMPLEAPI_KEY:
+        logger.warning("SIMPLEAPI_KEY no configurada, validando solo formato")
+        return {
+            "valido": True,
+            "existe": True,  # Asumimos que existe si pasa validacion local
+            "razon_social": None,
+            "glosa_giro": None,
+            "error": None,
+        }
 
-        response = requests.post(SRE_API_URL, json=payload, timeout=10)
+    try:
+        # Consultar API SimpleAPI.cl v2
+        headers = {
+            "Authorization": SIMPLEAPI_KEY,
+        }
+
+        # GET request con RUT en el path (API v2)
+        response = requests.get(
+            f"{SIMPLEAPI_URL}/{rut_limpio}",
+            headers=headers,
+            timeout=20,  # La API puede tardar entre 5-15 segundos
+        )
+
+        # Manejar errores HTTP especificos
+        if response.status_code == 400:
+            error_msg = (
+                response.text if response.text else "RUT invalido o no existe en el SII"
+            )
+            return {
+                "valido": True,
+                "existe": False,
+                "razon_social": None,
+                "glosa_giro": None,
+                "error": error_msg,
+            }
+
+        if response.status_code == 401:
+            logger.error("API Key invalida o sin suscripcion habilitada")
+            return {
+                "valido": False,
+                "existe": False,
+                "razon_social": None,
+                "glosa_giro": None,
+                "error": "Error de autenticacion con el servicio de validacion",
+            }
+
         response.raise_for_status()
 
         data = response.json()
 
-        # Verificar si el RUT existe
-        if not data.get("result", False):
+        # Verificar respuesta de SimpleAPI v2
+        if not data or "razonSocial" not in data:
             return {
                 "valido": True,
                 "existe": False,
@@ -139,16 +182,22 @@ def consultar_rut_sii(rut: str) -> dict:
                 "error": "RUT no encontrado en el SII",
             }
 
+        # Extraer primera actividad economica si existe
+        giro = None
+        actividades = data.get("actividadesEconomicas", [])
+        if actividades and len(actividades) > 0:
+            giro = actividades[0].get("descripcion")
+
         return {
             "valido": True,
             "existe": True,
-            "razon_social": data.get("razon_social"),
-            "glosa_giro": data.get("glosa_giro"),
+            "razon_social": data.get("razonSocial"),
+            "glosa_giro": giro,
             "error": None,
         }
 
     except requests.exceptions.Timeout:
-        logger.error("Timeout al consultar API sre.cl")
+        logger.error("Timeout al consultar API SimpleAPI.cl")
         return {
             "valido": False,
             "existe": False,
@@ -157,7 +206,7 @@ def consultar_rut_sii(rut: str) -> dict:
             "error": "Tiempo de espera agotado al consultar el SII",
         }
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error al consultar API sre.cl: {e}")
+        logger.error(f"Error al consultar API SimpleAPI.cl: {e}")
         return {
             "valido": False,
             "existe": False,
