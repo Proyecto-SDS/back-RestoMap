@@ -17,7 +17,6 @@ def create_roles(db):
             Rol(nombre="cocinero"),
             Rol(nombre="mesero"),
             Rol(nombre="bartender"),
-            Rol(nombre="cliente"),
         ]
     )
     db.commit()

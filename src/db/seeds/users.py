@@ -22,14 +22,14 @@ def create_users(db):
                 telefono="912345678",
             ),
             Usuario(
-                id_rol=6,  # cliente
-                nombre="Juan Pérez",
+                id_rol=None,  # Usuario sin rol = cliente implicito
+                nombre="Juan Perez",
                 correo="juan@test.cl",
                 contrasena=password_hash,
                 telefono="987654321",
             ),
             Usuario(
-                id_rol=6,  # cliente
+                id_rol=None,  # Usuario sin rol = cliente implicito
                 nombre="Maria Gonzalez",
                 correo="maria@test.cl",
                 contrasena=password_hash,

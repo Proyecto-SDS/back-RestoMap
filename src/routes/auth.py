@@ -99,7 +99,7 @@ def login(data: LoginSchema):
     try:
         correo = data.correo.lower()
         contrasena = data.contrasena
-        tipo_login = data.tipo_login
+        # tipo_login ya no se usa - login unificado
 
         db = next(get_db())
 
@@ -116,23 +116,6 @@ def login(data: LoginSchema):
             contrasena.encode("utf-8"), usuario.contrasena.encode("utf-8")
         ):
             return jsonify({"error": "Correo o contrasena incorrectos"}), 401
-
-        # VALIDACION: Verificar que el tipo de login coincida con el tipo de cuenta
-        es_empleado = usuario.id_local is not None
-
-        if tipo_login == "persona" and es_empleado:
-            return jsonify(
-                {
-                    "error": "Esta es una cuenta de empleado. Por favor usa el tab 'Empresa' para iniciar sesion"
-                }
-            ), 400
-
-        if tipo_login == "empresa" and not es_empleado:
-            return jsonify(
-                {
-                    "error": "Esta es una cuenta de persona. Por favor usa el tab 'Persona' para iniciar sesion"
-                }
-            ), 400
 
         # VALIDACION: Verificar coherencia de datos
         # Si tiene id_local, DEBE tener id_rol (empleado)
