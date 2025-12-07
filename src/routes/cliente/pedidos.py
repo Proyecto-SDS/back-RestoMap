@@ -3,6 +3,7 @@ Rutas de cliente para pedidos mediante QR
 Prefix: /api/cliente/*
 """
 
+import contextlib
 import traceback
 from datetime import datetime
 
@@ -343,7 +344,7 @@ def agregar_productos(codigo, user_id):
         db.commit()
 
         # Emitir evento WebSocket - Nueva encomienda
-        try:
+        with contextlib.suppress(Exception):
             emit_nueva_encomienda(
                 pedido.mesa.id_local if pedido.mesa else 0,
                 {
@@ -356,8 +357,6 @@ def agregar_productos(codigo, user_id):
                     "total": total_encomienda,
                 },
             )
-        except Exception:
-            pass  # No fallar si websocket no esta disponible
 
         return jsonify(
             {
@@ -395,7 +394,7 @@ def obtener_estado(codigo, user_id):
             .options(joinedload(QRDinamico.pedido).joinedload(Pedido.encomiendas))
             .where(QRDinamico.codigo == codigo)
         )
-        qr = db.execute(stmt).scalar_one_or_none()
+        qr = db.execute(stmt).unique().scalar_one_or_none()
 
         if not qr:
             return jsonify({"error": "QR no encontrado"}), 404
@@ -525,6 +524,74 @@ def agregar_nota(codigo, cuenta_id, user_id):
     except Exception as e:
         traceback.print_exc()
         db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@cliente_bp.route("/pedido-activo", methods=["GET"])
+@requerir_auth_persona
+def obtener_pedido_activo(user_id):
+    """
+    Obtiene el pedido activo del usuario si existe.
+    Retorna el código QR para poder retomar el pedido.
+
+    Returns:
+        { "tiene_pedido": true, "qr_codigo": "QR-XXXX", "pedido_id": 123, ... }
+        o
+        { "tiene_pedido": false }
+    """
+    db = get_session()
+
+    try:
+        # Buscar pedido activo del usuario (no completado ni cancelado)
+        stmt = (
+            select(Pedido)
+            .options(
+                joinedload(Pedido.qr),
+                joinedload(Pedido.mesa),
+                joinedload(Pedido.local),
+            )
+            .where(
+                Pedido.id_usuario == user_id,
+                Pedido.estado.notin_(
+                    [
+                        EstadoPedidoEnum.COMPLETADO,
+                        EstadoPedidoEnum.CANCELADO,
+                    ]
+                ),
+            )
+            .order_by(Pedido.creado_el.desc())
+            .limit(1)
+        )
+        pedido = db.execute(stmt).scalar_one_or_none()
+
+        if not pedido or not pedido.qr:
+            return jsonify({"tiene_pedido": False}), 200
+
+        # Verificar que el QR sigue activo
+        if not pedido.qr.activo:
+            return jsonify({"tiene_pedido": False}), 200
+
+        return jsonify(
+            {
+                "tiene_pedido": True,
+                "qr_codigo": pedido.qr.codigo,
+                "pedido_id": pedido.id,
+                "estado": pedido.estado.value if pedido.estado else "iniciado",
+                "mesa": {
+                    "id": pedido.mesa.id if pedido.mesa else None,
+                    "nombre": pedido.mesa.nombre if pedido.mesa else None,
+                },
+                "local": {
+                    "id": pedido.local.id if pedido.local else None,
+                    "nombre": pedido.local.nombre if pedido.local else None,
+                },
+            }
+        ), 200
+
+    except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()

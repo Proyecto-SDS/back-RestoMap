@@ -379,7 +379,7 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
                     cliente_info = {
                         "id": pedido.usuario.id,
                         "nombre": pedido.usuario.nombre,
-                        "email": pedido.usuario.email,
+                        "email": pedido.usuario.correo,
                     }
 
                 pedido_activo = {
