@@ -2,7 +2,7 @@ name: Despliegue BACK PRODUCCIÓN
 
 on:
   push:
-    branches: [ "pruebas-gcp-2" ] # Se activa solo al hacer push/merge a main
+    branches: [ "main" ] # Se activa solo al hacer push/merge a main
   workflow_dispatch:      # Permite ejecución manual desde la pestaña Actions
 
 env:
