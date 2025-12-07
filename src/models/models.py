@@ -512,6 +512,7 @@ class Mesa(Base):
     nombre = Column(String(30), nullable=False)
     descripcion = Column(String(100), nullable=True)
     capacidad = Column(SmallInteger, nullable=False)
+    orden = Column(SmallInteger, nullable=False, default=0, server_default="0")
     estado = Column(
         Enum(EstadoMesaEnum, name="estado_mesa_enum"),
         nullable=False,

@@ -32,15 +32,26 @@ mesas_bp = Blueprint("mesas", __name__, url_prefix="/mesas")
 class MesaCreateSchema(BaseModel):
     nombre: str
     capacidad: int
+    descripcion: str | None = None
 
 
 class MesaUpdateSchema(BaseModel):
     nombre: str | None = None
     capacidad: int | None = None
+    descripcion: str | None = None
 
 
 class MesaEstadoSchema(BaseModel):
     estado: EstadoMesaEnum
+
+
+class MesaOrdenItemSchema(BaseModel):
+    id: int
+    orden: int
+
+
+class MesasOrdenSchema(BaseModel):
+    mesas: list[MesaOrdenItemSchema]
 
 
 # ============================================
@@ -69,13 +80,40 @@ def listar_mesas(user_id, user_rol, id_local):
                     "id": mesa.id,
                     "id_local": mesa.id_local,
                     "nombre": mesa.nombre,
+                    "descripcion": mesa.descripcion,
                     "capacidad": mesa.capacidad,
+                    "orden": mesa.orden,
                     "estado": mesa.estado.value if mesa.estado else "disponible",
                     "pedidos_count": pedidos_count,
                 }
             )
 
         return jsonify(result), 200
+    finally:
+        db.close()
+
+
+@mesas_bp.route("/orden", methods=["PUT"])
+@requerir_auth
+@requerir_empleado
+@requerir_roles_empresa("gerente", "mesero")
+def actualizar_orden_mesas(user_id, user_rol, id_local):
+    """Actualizar orden de multiples mesas (Drag and Drop)"""
+    try:
+        data = MesasOrdenSchema(**request.get_json())
+    except ValidationError as e:
+        return jsonify({"error": "Datos invalidos", "details": e.errors()}), 400
+
+    db = get_session()
+    try:
+        for item in data.mesas:
+            stmt = select(Mesa).where(Mesa.id == item.id, Mesa.id_local == id_local)
+            mesa = db.execute(stmt).scalar_one_or_none()
+            if mesa:
+                mesa.orden = item.orden
+
+        db.commit()
+        return jsonify({"message": "Orden actualizado exitosamente"}), 200
     finally:
         db.close()
 
@@ -102,10 +140,17 @@ def crear_mesa(user_id, user_rol, id_local):
                 {"error": f"Ya existe una mesa con el nombre '{data.nombre}'"}
             ), 400
 
+        # Obtener el orden maximo actual para asignar al final
+        stmt_max = select(Mesa).where(Mesa.id_local == id_local)
+        mesas_existentes = db.execute(stmt_max).scalars().all()
+        max_orden = max((m.orden for m in mesas_existentes), default=-1)
+
         nueva_mesa = Mesa(
             id_local=id_local,
             nombre=data.nombre,
+            descripcion=data.descripcion,
             capacidad=data.capacidad,
+            orden=max_orden + 1,
             estado=EstadoMesaEnum.DISPONIBLE,
         )
         db.add(nueva_mesa)
@@ -118,7 +163,9 @@ def crear_mesa(user_id, user_rol, id_local):
                 "mesa": {
                     "id": nueva_mesa.id,
                     "nombre": nueva_mesa.nombre,
+                    "descripcion": nueva_mesa.descripcion,
                     "capacidad": nueva_mesa.capacidad,
+                    "orden": nueva_mesa.orden,
                     "estado": nueva_mesa.estado.value,
                 },
             }
@@ -162,6 +209,9 @@ def actualizar_mesa(mesa_id, user_id, user_rol, id_local):
         if data.capacidad is not None:
             mesa.capacidad = data.capacidad
 
+        if data.descripcion is not None:
+            mesa.descripcion = data.descripcion
+
         db.commit()
 
         return jsonify(
@@ -170,7 +220,9 @@ def actualizar_mesa(mesa_id, user_id, user_rol, id_local):
                 "mesa": {
                     "id": mesa.id,
                     "nombre": mesa.nombre,
+                    "descripcion": mesa.descripcion,
                     "capacidad": mesa.capacidad,
+                    "orden": mesa.orden,
                     "estado": mesa.estado.value if mesa.estado else "disponible",
                 },
             }

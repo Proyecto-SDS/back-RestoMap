@@ -230,6 +230,7 @@ def create_locals(db):
                     nombre=f"Mesa {i}",
                     descripcion="Mesa para 4 personas - Zona principal",
                     capacidad=4,
+                    orden=i,
                     estado=EstadoMesaEnum.DISPONIBLE,
                 )
             )
@@ -241,6 +242,7 @@ def create_locals(db):
                     nombre=f"Mesa {i}",
                     descripcion="Mesa para 6 personas - Terraza",
                     capacidad=6,
+                    orden=i,
                     estado=EstadoMesaEnum.DISPONIBLE,
                 )
             )
@@ -251,6 +253,7 @@ def create_locals(db):
                 nombre="Mesa 1",
                 descripcion="Mesa intima junto a la ventana",
                 capacidad=2,
+                orden=1,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -260,6 +263,7 @@ def create_locals(db):
                 nombre="Mesa 2",
                 descripcion="Mesa intima en el balcon",
                 capacidad=2,
+                orden=2,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -269,6 +273,7 @@ def create_locals(db):
                 nombre="Mesa 3",
                 descripcion="Mesa estandar",
                 capacidad=4,
+                orden=3,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -278,6 +283,7 @@ def create_locals(db):
                 nombre="Mesa 4",
                 descripcion="Mesa estandar",
                 capacidad=4,
+                orden=4,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -287,6 +293,7 @@ def create_locals(db):
                 nombre="Mesa 5",
                 descripcion="Mesa estandar",
                 capacidad=4,
+                orden=5,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -296,6 +303,7 @@ def create_locals(db):
                 nombre="Mesa 6",
                 descripcion="Mesa familiar",
                 capacidad=6,
+                orden=6,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -305,6 +313,7 @@ def create_locals(db):
                 nombre="Mesa 7",
                 descripcion="Mesa familiar",
                 capacidad=6,
+                orden=7,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -314,6 +323,7 @@ def create_locals(db):
                 nombre="Mesa 8",
                 descripcion="Mesa grande para grupos",
                 capacidad=8,
+                orden=8,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -327,6 +337,7 @@ def create_locals(db):
                     nombre=f"Mesa {i}",
                     descripcion=desc,
                     capacidad=capacidad,
+                    orden=i,
                     estado=EstadoMesaEnum.DISPONIBLE,
                 )
             )
@@ -337,6 +348,7 @@ def create_locals(db):
                 nombre="Mesa 1",
                 descripcion="Mesa estandar",
                 capacidad=4,
+                orden=1,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -346,6 +358,7 @@ def create_locals(db):
                 nombre="Mesa 2",
                 descripcion="Mesa estandar",
                 capacidad=4,
+                orden=2,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -355,6 +368,7 @@ def create_locals(db):
                 nombre="Mesa 3",
                 descripcion="Mesa grande",
                 capacidad=6,
+                orden=3,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -364,6 +378,7 @@ def create_locals(db):
                 nombre="Mesa 4",
                 descripcion="Mesa grande",
                 capacidad=6,
+                orden=4,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -373,6 +388,7 @@ def create_locals(db):
                 nombre="Barra 1",
                 descripcion="Asiento en barra alta",
                 capacidad=2,
+                orden=5,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )
@@ -382,6 +398,7 @@ def create_locals(db):
                 nombre="Barra 2",
                 descripcion="Asiento en barra alta",
                 capacidad=2,
+                orden=6,
                 estado=EstadoMesaEnum.DISPONIBLE,
             )
         )

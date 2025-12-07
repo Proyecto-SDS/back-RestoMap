@@ -20,10 +20,10 @@ def create_reservations(db):
         )
         # Reserva pendiente
         reserva2 = Reserva(
-            id_local=2,
+            id_local=1,
             id_usuario=3,
             fecha_reserva=date.today() + timedelta(days=5),
-            hora_reserva=time(21, 30),
+            hora_reserva=time(18, 30),
             estado=EstadoReservaEnum.PENDIENTE,
         )
         db.add_all([reserva1, reserva2])
@@ -35,10 +35,6 @@ def create_reservations(db):
                 ReservaMesa(
                     id_reserva=reserva1.id,
                     id_mesa=1,
-                ),
-                ReservaMesa(
-                    id_reserva=reserva1.id,
-                    id_mesa=2,
                 ),
                 ReservaMesa(
                     id_reserva=reserva2.id,

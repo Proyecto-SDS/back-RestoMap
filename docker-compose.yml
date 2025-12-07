@@ -72,7 +72,8 @@ services:
     volumes:
       # Mount codigo para hot-reload
       - ./src:/app/src:ro
-      - ./alembic:/app/alembic:ro
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
