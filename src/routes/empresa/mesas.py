@@ -338,9 +338,10 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
         stmt = (
             select(Mesa)
             .options(
+                joinedload(Mesa.pedidos).joinedload(Pedido.usuario),
                 joinedload(Mesa.pedidos)
                 .joinedload(Pedido.cuentas)
-                .joinedload(Cuenta.producto)
+                .joinedload(Cuenta.producto),
             )
             .where(Mesa.id == mesa_id, Mesa.id_local == id_local)
         )
@@ -372,6 +373,15 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
                             "observaciones": cuenta.observaciones,
                         }
                     )
+
+                cliente_info = None
+                if pedido.usuario:
+                    cliente_info = {
+                        "id": pedido.usuario.id,
+                        "nombre": pedido.usuario.nombre,
+                        "email": pedido.usuario.email,
+                    }
+
                 pedido_activo = {
                     "id": pedido.id,
                     "estado": pedido.estado.value if pedido.estado else None,
@@ -380,6 +390,7 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
                     if pedido.creado_el
                     else None,
                     "lineas": lineas,
+                    "cliente": cliente_info,
                 }
                 break
 

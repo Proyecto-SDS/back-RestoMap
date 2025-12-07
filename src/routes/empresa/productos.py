@@ -12,6 +12,7 @@ from database import get_session
 from models.models import EstadoProductoEnum, Producto
 from routes.empresa import requerir_empleado, requerir_roles_empresa
 from utils.jwt_helper import requerir_auth
+from websockets import emit_producto_actualizado
 
 productos_bp = Blueprint("productos", __name__, url_prefix="/productos")
 
@@ -120,6 +121,19 @@ def cambiar_estado_producto(producto_id, user_id, user_rol, id_local):
 
         producto.estado = data.estado
         db.commit()
+
+        # Emitir evento WebSocket
+        try:
+            emit_producto_actualizado(
+                id_local,
+                {
+                    "id": producto.id,
+                    "estado": producto.estado.value,
+                    "id_categoria": producto.id_categoria,
+                },
+            )
+        except Exception:
+            pass
 
         return jsonify(
             {

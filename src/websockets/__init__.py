@@ -23,9 +23,9 @@ def register_handlers():
         emit("connected", {"status": "ok"})
 
     @socketio.on("disconnect")
-    def handle_disconnect():
+    def handle_disconnect(*args):
         """Cliente desconectado."""
-        print("[WS] Cliente desconectado")
+        print(f"[WS] Cliente desconectado. Args: {args}")
 
     @socketio.on("join_local")
     def handle_join_local(data):
@@ -121,5 +121,32 @@ def emit_mesa_actualizada(local_id: int, mesa_id: int, estado: str):
     socketio.emit(
         "mesa_actualizada",
         {"mesa_id": mesa_id, "estado": estado},
+        room=f"local_{local_id}",
+    )
+
+
+def emit_nueva_reserva(local_id: int, reserva_data: dict):
+    """Notifica que hay una nueva reserva."""
+    socketio.emit(
+        "nueva_reserva",
+        reserva_data,
+        room=f"local_{local_id}",
+    )
+
+
+def emit_reserva_actualizada(local_id: int, reserva_data: dict):
+    """Notifica cambio de estado en una reserva."""
+    socketio.emit(
+        "reserva_actualizada",
+        reserva_data,
+        room=f"local_{local_id}",
+    )
+
+
+def emit_producto_actualizado(local_id: int, producto_data: dict):
+    """Notifica cambio en un producto (stock, precio, estado)."""
+    socketio.emit(
+        "producto_actualizado",
+        producto_data,
         room=f"local_{local_id}",
     )

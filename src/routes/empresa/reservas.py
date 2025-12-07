@@ -11,6 +11,7 @@ from database import get_session
 from models.models import EstadoReservaEnum, Reserva, ReservaMesa
 from routes.empresa import requerir_empleado, requerir_roles_empresa
 from utils.jwt_helper import requerir_auth
+from websockets import emit_reserva_actualizada
 
 reservas_bp = Blueprint("reservas_empresa", __name__, url_prefix="/reservas")
 
@@ -122,6 +123,21 @@ def cancelar_reserva(reserva_id, user_id, user_rol, id_local):
 
         reserva.estado = EstadoReservaEnum.RECHAZADA
         db.commit()
+
+        # Emitir evento WebSocket
+        try:
+            emit_reserva_actualizada(
+                id_local,
+                {
+                    "id": reserva.id,
+                    "estado": reserva.estado.value,
+                    "usuario_nombre": reserva.usuario.nombre
+                    if reserva.usuario
+                    else "Usuario",
+                },
+            )
+        except Exception:
+            pass
 
         return jsonify(
             {

@@ -12,6 +12,7 @@ from database import get_session
 from models.models import Cuenta, EstadoPedidoEnum, Pedido
 from routes.empresa import requerir_empleado, requerir_roles_empresa
 from utils.jwt_helper import requerir_auth
+from websockets import emit_estado_pedido
 
 pedidos_bp = Blueprint("pedidos", __name__, url_prefix="/pedidos")
 
@@ -183,6 +184,12 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
 
         pedido.estado = data.estado
         db.commit()
+
+        # Emitir evento WebSocket - Estado del pedido actualizado
+        try:
+            emit_estado_pedido(id_local, pedido.id, data.estado.value)
+        except Exception:
+            pass  # No fallar si websocket no esta disponible
 
         return jsonify(
             {

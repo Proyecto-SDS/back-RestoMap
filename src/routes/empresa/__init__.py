@@ -78,6 +78,7 @@ def requerir_roles_empresa(*roles_permitidos):
 
 # Importar sub-blueprints
 from routes.empresa.empleados import empleados_bp
+from routes.empresa.encomiendas import encomiendas_bp
 from routes.empresa.mesas import mesas_bp
 from routes.empresa.pedidos import pedidos_bp
 from routes.empresa.productos import productos_bp
@@ -87,6 +88,7 @@ from routes.empresa.stats import stats_bp
 # Registrar sub-blueprints
 empresa_bp.register_blueprint(mesas_bp)
 empresa_bp.register_blueprint(pedidos_bp)
+empresa_bp.register_blueprint(encomiendas_bp)
 empresa_bp.register_blueprint(empleados_bp)
 empresa_bp.register_blueprint(productos_bp)
 empresa_bp.register_blueprint(reservas_bp)
