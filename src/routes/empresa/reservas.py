@@ -23,6 +23,97 @@ reservas_bp = Blueprint("reservas_empresa", __name__, url_prefix="/reservas")
 # ============================================
 
 
+@reservas_bp.route("/stats/periodos", methods=["GET"])
+@requerir_auth
+@requerir_empleado
+@requerir_roles_empresa("gerente", "mesero")
+def obtener_periodos_reservas(user_id, user_rol, id_local):
+    """
+    Obtiene los años y meses con reservas registradas, incluyendo conteos.
+    Retorna:
+    - years: Lista de años con reservas + 1 año adelante, con conteo
+    - months: Conteo de reservas por mes para el año seleccionado (si se pasa year)
+    """
+    from datetime import datetime
+
+    from sqlalchemy import extract, func
+
+    year_param = request.args.get("year")
+
+    db = get_session()
+    try:
+        # Obtener años únicos con reservas
+        years_stmt = (
+            select(
+                extract("year", Reserva.fecha_reserva).label("year"),
+                func.count(Reserva.id).label("count"),
+            )
+            .where(Reserva.id_local == id_local)
+            .group_by(extract("year", Reserva.fecha_reserva))
+            .order_by(extract("year", Reserva.fecha_reserva).desc())
+        )
+
+        years_result = db.execute(years_stmt).all()
+
+        # Construir lista de años con conteos
+        years_data = []
+        existing_years = set()
+
+        for row in years_result:
+            year_val = int(row.year)
+            existing_years.add(year_val)
+            years_data.append({"year": year_val, "count": row.count})
+
+        # Agregar el año actual si no existe
+        current_year = datetime.now().year
+        if current_year not in existing_years:
+            years_data.append({"year": current_year, "count": 0})
+            existing_years.add(current_year)
+
+        # Agregar 1 año adelante si no existe
+        next_year = current_year + 1
+        if next_year not in existing_years:
+            years_data.append({"year": next_year, "count": 0})
+
+        # Ordenar años de forma descendente
+        years_data.sort(key=lambda x: x["year"], reverse=True)
+
+        # Si se solicita un año específico, obtener conteo por mes
+        months_data = []
+        if year_param:
+            try:
+                year_int = int(year_param)
+                months_stmt = (
+                    select(
+                        extract("month", Reserva.fecha_reserva).label("month"),
+                        func.count(Reserva.id).label("count"),
+                    )
+                    .where(
+                        Reserva.id_local == id_local,
+                        extract("year", Reserva.fecha_reserva) == year_int,
+                    )
+                    .group_by(extract("month", Reserva.fecha_reserva))
+                    .order_by(extract("month", Reserva.fecha_reserva))
+                )
+
+                months_result = db.execute(months_stmt).all()
+
+                # Crear diccionario de conteos por mes
+                month_counts = {int(row.month): row.count for row in months_result}
+
+                # Generar todos los meses (1-12) con sus conteos
+                for month_num in range(1, 13):
+                    months_data.append(
+                        {"month": month_num, "count": month_counts.get(month_num, 0)}
+                    )
+            except ValueError:
+                pass
+
+        return jsonify({"years": years_data, "months": months_data}), 200
+    finally:
+        db.close()
+
+
 @reservas_bp.route("/", methods=["GET"])
 @requerir_auth
 @requerir_empleado
