@@ -71,6 +71,8 @@ class GenerarQRSchema(BaseModel):
 @requerir_roles_empresa("gerente", "mesero")
 def listar_mesas(user_id, user_rol, id_local):
     """Listar todas las mesas del local"""
+    from models.models import EstadoMesaEnum, Reserva, ReservaMesa
+
     db = get_session()
     try:
         stmt = select(Mesa).where(Mesa.id_local == id_local)
@@ -81,6 +83,40 @@ def listar_mesas(user_id, user_rol, id_local):
             pedidos_count = len(
                 [p for p in mesa.pedidos if p.estado not in ["completado", "cancelado"]]
             )
+
+            # Obtener num_personas según el estado de la mesa
+            num_personas = None
+
+            if mesa.estado == EstadoMesaEnum.OCUPADA:
+                # Buscar pedido activo de esta mesa
+                pedido_activo = next(
+                    (
+                        p
+                        for p in mesa.pedidos
+                        if p.estado
+                        not in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]
+                    ),
+                    None,
+                )
+                if pedido_activo:
+                    num_personas = pedido_activo.num_personas
+
+            elif mesa.estado == EstadoMesaEnum.RESERVADA:
+                # Buscar reserva activa de esta mesa
+                stmt_reserva = (
+                    select(Reserva)
+                    .join(ReservaMesa)
+                    .where(
+                        ReservaMesa.id_mesa == mesa.id,
+                        Reserva.estado.in_(["pendiente", "confirmada"]),
+                    )
+                    .order_by(Reserva.fecha_reserva.desc())
+                    .limit(1)
+                )
+                reserva = db.execute(stmt_reserva).scalar_one_or_none()
+                if reserva:
+                    num_personas = reserva.num_personas
+
             result.append(
                 {
                     "id": mesa.id,
@@ -91,6 +127,7 @@ def listar_mesas(user_id, user_rol, id_local):
                     "orden": mesa.orden,
                     "estado": mesa.estado.value if mesa.estado else "disponible",
                     "pedidos_count": pedidos_count,
+                    "num_personas": num_personas,
                 }
             )
 
