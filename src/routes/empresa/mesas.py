@@ -11,6 +11,8 @@ from sqlalchemy.orm import joinedload
 from database import get_session
 from models.models import (
     Cuenta,
+    Encomienda,
+    EncomiendaCuenta,
     EstadoMesaEnum,
     EstadoPedidoEnum,
     Mesa,
@@ -342,6 +344,11 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
                 joinedload(Mesa.pedidos)
                 .joinedload(Pedido.cuentas)
                 .joinedload(Cuenta.producto),
+                joinedload(Mesa.pedidos)
+                .joinedload(Pedido.encomiendas)
+                .joinedload(Encomienda.cuentas_encomienda)
+                .joinedload(EncomiendaCuenta.cuenta)
+                .joinedload(Cuenta.producto),
             )
             .where(Mesa.id == mesa_id, Mesa.id_local == id_local)
         )
@@ -382,6 +389,40 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
                         "email": pedido.usuario.correo,
                     }
 
+                # Ordenar encomiendas por fecha de creación
+                encomiendas_ordenadas = sorted(
+                    pedido.encomiendas, key=lambda e: e.creado_el or ""
+                )
+                encomiendas_list = []
+                for idx, enc in enumerate(encomiendas_ordenadas):
+                    items = []
+                    for ec in enc.cuentas_encomienda:
+                        cuenta = ec.cuenta
+                        items.append(
+                            {
+                                "id": cuenta.id,
+                                "producto": cuenta.producto.nombre
+                                if cuenta.producto
+                                else "Producto eliminado",
+                                "cantidad": cuenta.cantidad,
+                                "precio_unitario": cuenta.producto.precio
+                                if cuenta.producto
+                                else 0,
+                                "observaciones": cuenta.observaciones,
+                            }
+                        )
+                    encomiendas_list.append(
+                        {
+                            "id": enc.id,
+                            "estado": enc.estado.value if enc.estado else None,
+                            "nombre": "Pedido" if idx == 0 else f"Pedido Extra #{idx}",
+                            "items": items,
+                            "creado_el": enc.creado_el.isoformat()
+                            if enc.creado_el
+                            else None,
+                        }
+                    )
+
                 pedido_activo = {
                     "id": pedido.id,
                     "estado": pedido.estado.value if pedido.estado else None,
@@ -391,6 +432,7 @@ def obtener_mesa(mesa_id, user_id, user_rol, id_local):
                     else None,
                     "lineas": lineas,
                     "cliente": cliente_info,
+                    "encomiendas": encomiendas_list,
                 }
                 break
 

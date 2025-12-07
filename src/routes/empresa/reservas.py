@@ -3,6 +3,8 @@ Rutas para gestión de reservas del local
 Prefix: /api/empresa/reservas/*
 """
 
+import contextlib
+
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -28,6 +30,8 @@ reservas_bp = Blueprint("reservas_empresa", __name__, url_prefix="/reservas")
 def listar_reservas(user_id, user_rol, id_local):
     """Listar todas las reservas del local"""
     fecha_filter = request.args.get("fecha")
+    fecha_inicio = request.args.get("fecha_inicio")
+    fecha_fin = request.args.get("fecha_fin")
     estado_filter = request.args.get("estado")
 
     db = get_session()
@@ -43,12 +47,23 @@ def listar_reservas(user_id, user_rol, id_local):
             .order_by(Reserva.fecha_reserva.desc(), Reserva.hora_reserva.desc())
         )
 
-        if fecha_filter:
-            from datetime import datetime
+        # Filtro por fecha exacta o por rango de fechas
+        from datetime import datetime
 
+        if fecha_filter:
             try:
                 fecha = datetime.strptime(fecha_filter, "%Y-%m-%d").date()
                 stmt = stmt.where(Reserva.fecha_reserva == fecha)
+            except ValueError:
+                pass
+        elif fecha_inicio and fecha_fin:
+            try:
+                f_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+                f_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+                stmt = stmt.where(
+                    Reserva.fecha_reserva >= f_inicio,
+                    Reserva.fecha_reserva <= f_fin,
+                )
             except ValueError:
                 pass
 
@@ -125,7 +140,7 @@ def cancelar_reserva(reserva_id, user_id, user_rol, id_local):
         db.commit()
 
         # Emitir evento WebSocket
-        try:
+        with contextlib.suppress(Exception):
             emit_reserva_actualizada(
                 id_local,
                 {
@@ -136,8 +151,6 @@ def cancelar_reserva(reserva_id, user_id, user_rol, id_local):
                     else "Usuario",
                 },
             )
-        except Exception:
-            pass
 
         return jsonify(
             {

@@ -3,6 +3,8 @@ Rutas para gestión de encomiendas (items de cocina/barra)
 Prefix: /api/empresa/encomiendas/*
 """
 
+import contextlib
+
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
@@ -54,15 +56,13 @@ def cambiar_estado_encomienda(encomienda_id, user_id, user_rol, id_local):
         db.commit()
 
         # Emitir evento WebSocket
-        try:
+        with contextlib.suppress(Exception):
             emit_estado_encomienda(
                 id_local,
                 encomienda.pedido.id,
                 encomienda.id,
                 encomienda.estado.value,
             )
-        except Exception:
-            pass
 
         return jsonify(
             {

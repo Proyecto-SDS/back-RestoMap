@@ -129,7 +129,9 @@ def actualizar_empleado(empleado_id, user_id, user_rol, id_local):
             if data.rol not in roles_permitidos:
                 return jsonify(
                     {
-                        "error": f"Rol inválido. Permitidos: {', '.join(roles_permitidos)}"
+                        "error": (
+                            f"Rol inválido. Permitidos: {', '.join(roles_permitidos)}"
+                        )
                     }
                 ), 400
             empleado.rol = data.rol

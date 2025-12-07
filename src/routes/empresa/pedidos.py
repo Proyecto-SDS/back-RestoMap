@@ -3,6 +3,8 @@ Rutas para gestión de pedidos del local
 Prefix: /api/empresa/pedidos/*
 """
 
+import contextlib
+
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
@@ -186,10 +188,8 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
         db.commit()
 
         # Emitir evento WebSocket - Estado del pedido actualizado
-        try:
+        with contextlib.suppress(Exception):
             emit_estado_pedido(id_local, pedido.id, data.estado.value)
-        except Exception:
-            pass  # No fallar si websocket no esta disponible
 
         return jsonify(
             {

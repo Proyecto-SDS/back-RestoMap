@@ -3,6 +3,8 @@ Rutas para gestión de productos del local
 Prefix: /api/empresa/productos/*
 """
 
+import contextlib
+
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import select
@@ -123,7 +125,7 @@ def cambiar_estado_producto(producto_id, user_id, user_rol, id_local):
         db.commit()
 
         # Emitir evento WebSocket
-        try:
+        with contextlib.suppress(Exception):
             emit_producto_actualizado(
                 id_local,
                 {
@@ -132,8 +134,6 @@ def cambiar_estado_producto(producto_id, user_id, user_rol, id_local):
                     "id_categoria": producto.id_categoria,
                 },
             )
-        except Exception:
-            pass
 
         return jsonify(
             {
