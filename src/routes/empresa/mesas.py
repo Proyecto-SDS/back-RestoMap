@@ -54,6 +54,10 @@ class MesasOrdenSchema(BaseModel):
     mesas: list[MesaOrdenItemSchema]
 
 
+class GenerarQRSchema(BaseModel):
+    num_personas: int
+
+
 # ============================================
 # ENDPOINTS
 # ============================================
@@ -121,7 +125,7 @@ def actualizar_orden_mesas(user_id, user_rol, id_local):
 @mesas_bp.route("/", methods=["POST"])
 @requerir_auth
 @requerir_empleado
-@requerir_roles_empresa("gerente")
+@requerir_roles_empresa("gerente", "mesero")
 def crear_mesa(user_id, user_rol, id_local):
     """Crear una nueva mesa"""
     try:
@@ -310,16 +314,24 @@ def generar_qr_mesa(mesa_id, user_id, user_rol, id_local):
 
     db = get_session()
     try:
+        # Validar request body
+        try:
+            data = request.get_json() or {}
+            qr_data = GenerarQRSchema(**data)
+        except ValidationError as e:
+            return jsonify({"error": "Datos inválidos", "details": e.errors()}), 400
+
         stmt = select(Mesa).where(Mesa.id == mesa_id, Mesa.id_local == id_local)
         mesa = db.execute(stmt).scalar_one_or_none()
 
         if not mesa:
             return jsonify({"error": "Mesa no encontrada"}), 404
 
-        # Verificar si ya hay un QR activo para esta mesa
+        # Verificar si ya hay un QR activo para esta mesa (solo QRs de pedido, no de reserva)
         stmt_qr = select(QRDinamico).where(
             QRDinamico.id_mesa == mesa_id,
             QRDinamico.activo.is_(True),
+            QRDinamico.id_reserva.is_(None),  # Solo QRs de pedido directo
         )
         qr_existente = db.execute(stmt_qr).scalar_one_or_none()
 
@@ -349,16 +361,22 @@ def generar_qr_mesa(mesa_id, user_id, user_rol, id_local):
         # Generar nuevo codigo unico
         codigo = f"QR-{secrets.token_urlsafe(8).upper()}"
 
-        # Expiracion: 4 horas desde ahora
-        expiracion = datetime.now() + timedelta(hours=4)
+        # Expiracion INICIAL: 5 minutos (CASO 2 - PEDIDO)
+        # Si el cliente no escanea en 5 min, el QR expira
+        # Al escanear, se extiende automáticamente a 2 horas
+        expiracion = datetime.now() + timedelta(minutes=5)
 
         # Crear nuevo QR
+        # CASO 2 - PEDIDO: Tiene num_personas, NO tiene id_reserva (NULL)
+        # id_pedido es NULL al inicio, se llena cuando el cliente escanea el QR
         nuevo_qr = QRDinamico(
             id_mesa=mesa_id,
             id_usuario=user_id,
+            id_reserva=None,  # NULL - esto es para pedidos directos, no reservas
             codigo=codigo,
             expiracion=expiracion,
             activo=True,
+            num_personas=qr_data.num_personas,  # Guardado para transferir al Pedido
         )
         db.add(nuevo_qr)
         db.commit()

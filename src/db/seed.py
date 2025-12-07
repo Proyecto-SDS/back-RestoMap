@@ -38,7 +38,6 @@ try:
             create_catalogs,
             create_interactions,
             create_locals,
-            create_orders,
             create_products,
             create_qrs,
             create_reservations,
@@ -50,7 +49,6 @@ try:
             create_catalogs,
             create_interactions,
             create_locals,
-            create_orders,
             create_products,
             create_qrs,
             create_reservations,
@@ -105,7 +103,6 @@ def seed_database():
         create_products(db)
         create_interactions(db)
         create_reservations(db)
-        create_orders(db)
         create_qrs(db)
 
         logger.info("Base de datos poblada exitosamente con datos completos!")

@@ -861,6 +861,7 @@ class Reserva(Base):
     )
     fecha_reserva = Column(Date, nullable=False)
     hora_reserva = Column(Time, nullable=False)
+    num_personas = Column(SmallInteger, nullable=False, default=1)
     estado = Column(
         Enum(EstadoReservaEnum, name="estado_reserva_enum"),
         nullable=False,
@@ -949,6 +950,7 @@ class QRDinamico(Base):
     codigo = Column(String(255), nullable=False, unique=True, index=True)
     expiracion = Column(DateTime(timezone=True), nullable=False)
     activo = Column(Boolean, default=True, nullable=False, index=True)
+    num_personas = Column(SmallInteger, nullable=True, default=None)
     creado_el = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1005,6 +1007,7 @@ class Pedido(Base):
         default=EstadoPedidoEnum.INICIADO,
         index=True,
     )
+    num_personas = Column(SmallInteger, nullable=False, default=None)
     total = Column(Integer, nullable=False, default=0)
     creado_el = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
@@ -1273,6 +1276,7 @@ class PedidoSchema(BaseModel):
     id_qr: int
     creado_por: int
     estado: EstadoPedidoEnum
+    num_personas: int | None = None
     total: int
 
     class Config:
@@ -1312,6 +1316,7 @@ class QRDinamicoSchema(BaseModel):
     codigo: str
     expiracion: datetime
     activo: bool
+    num_personas: int | None = None
     creado_el: datetime | None = None
 
     class Config:

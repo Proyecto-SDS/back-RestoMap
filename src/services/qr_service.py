@@ -20,10 +20,11 @@ logger = get_logger(__name__)
 def generar_codigo_unico() -> str:
     """
     Genera un codigo único alfanumérico para el QR
-    Formato: QR-XXXXXXXXXXXXXXXX (8 bytes = 16 caracteres hex)
+    Formato: QR-XXXXXXXX (8 bytes = ~11 caracteres URL-safe)
+    Consistente entre reservas y pedidos
     """
-    codigo_hex = secrets.token_hex(8)
-    return f"QR-{codigo_hex.upper()}"
+    codigo_urlsafe = secrets.token_urlsafe(8)
+    return f"QR-{codigo_urlsafe.upper()}"
 
 
 def generar_qr_imagen(data: str, size: int = 10) -> str:
@@ -93,6 +94,20 @@ def crear_qr_reserva(
     codigo = generar_codigo_unico()
     logger.info(f"[QR Service] Codigo generado: {codigo}")
 
+    # Desactivar QRs anteriores de esta reserva (por si hubo regeneración)
+    qrs_anteriores = (
+        db_session.query(QRDinamico)
+        .filter(QRDinamico.id_reserva == id_reserva, QRDinamico.activo)
+        .all()
+    )
+
+    if qrs_anteriores:
+        logger.info(
+            f"[QR Service] Desactivando {len(qrs_anteriores)} QR(s) anterior(es)"
+        )
+        for qr_anterior in qrs_anteriores:
+            qr_anterior.activo = False  # type: ignore
+
     # Calcular fecha de expiracion: fecha+hora de reserva + tolerancia
     # Combinar fecha y hora de la reserva
     # pyrefly: ignore [bad-argument-type]
@@ -102,14 +117,16 @@ def crear_qr_reserva(
     logger.info(f"[QR Service] Expiracion calculada: {expiracion}")
 
     # Crear registro en la base de datos
+    # CASO 1 - RESERVA: No tiene id_pedido ni num_personas (ambos NULL)
     qr_dinamico = QRDinamico(
         id_mesa=id_mesa,
         id_reserva=id_reserva,
-        id_pedido=None,
+        id_pedido=None,  # NULL hasta que se confirme la reserva
         id_usuario=id_usuario,
         codigo=codigo,
         expiracion=expiracion,
         activo=True,
+        num_personas=None,  # NULL - el num_personas está en la Reserva, no en el QR
     )
 
     db_session.add(qr_dinamico)

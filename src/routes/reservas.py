@@ -160,6 +160,7 @@ def crear_reserva(data: ReservaCreateInputSchema, user_id):
             id_usuario=user_id,
             fecha_reserva=fecha_reserva,
             hora_reserva=hora_reserva,
+            num_personas=numero_personas,
             estado=EstadoReservaEnum.PENDIENTE,
             creado_el=datetime.utcnow(),
         )

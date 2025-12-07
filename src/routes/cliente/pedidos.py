@@ -5,7 +5,7 @@ Prefix: /api/cliente/*
 
 import contextlib
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
@@ -74,7 +74,18 @@ def validar_qr(user_id):
 
         # Verificar expiracion
         if qr.expiracion and qr.expiracion < datetime.now(qr.expiracion.tzinfo):
+            # Marcar QR como inactivo si expiró
+            qr.activo = False
+            db.commit()
             return jsonify({"error": "Este codigo QR ha expirado"}), 400
+
+        # VALIDACIÓN: QRs de reserva solo pueden usarse después de confirmación
+        if qr.id_reserva and not qr.id_pedido:
+            return jsonify(
+                {
+                    "error": "Este QR corresponde a una reserva. Debe ser confirmada por el personal del restaurante."
+                }
+            ), 400
 
         mesa = qr.mesa
         if not mesa:
@@ -89,6 +100,20 @@ def validar_qr(user_id):
         pedido = qr.pedido
 
         if not pedido:
+            # Determinar num_personas según el tipo de QR
+            num_personas = None
+
+            if qr.id_reserva:
+                # CASO 1 - RESERVA: Obtener num_personas de la Reserva
+                from models import Reserva
+
+                reserva = db.query(Reserva).filter(Reserva.id == qr.id_reserva).first()
+                if reserva:
+                    num_personas = reserva.num_personas
+            else:
+                # CASO 2 - PEDIDO: Obtener num_personas del QR
+                num_personas = qr.num_personas
+
             # Crear nuevo pedido
             pedido = Pedido(
                 id_local=mesa.id_local,
@@ -98,12 +123,18 @@ def validar_qr(user_id):
                 creado_por=user_id,
                 estado=EstadoPedidoEnum.INICIADO,
                 total=0,
+                num_personas=num_personas,
             )
             db.add(pedido)
             db.flush()
 
             # Actualizar QR con pedido
             qr.id_pedido = pedido.id
+
+            # CASO 2 - PEDIDO: Extender expiración a 2 horas al escanear
+            # (solo si no es reserva)
+            if not qr.id_reserva:
+                qr.expiracion = datetime.now() + timedelta(hours=2)
 
             # Cambiar estado de mesa a ocupada
             mesa.estado = EstadoMesaEnum.OCUPADA

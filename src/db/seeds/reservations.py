@@ -1,48 +1,13 @@
-from datetime import date, time, timedelta
-
 from config import get_logger
-from models import EstadoReservaEnum, Reserva, ReservaMesa
 
 logger = get_logger(__name__)
 
 
 def create_reservations(db):
-    # ============ Reservas ============
-    logger.info("  → Insertando Reservas de ejemplo...")
-    if db.query(Reserva).count() == 0:
-        # Reserva confirmada
-        reserva1 = Reserva(
-            id_local=1,
-            id_usuario=2,
-            fecha_reserva=date.today() + timedelta(days=2),
-            hora_reserva=time(20, 0),
-            estado=EstadoReservaEnum.CONFIRMADA,
-        )
-        # Reserva pendiente
-        reserva2 = Reserva(
-            id_local=1,
-            id_usuario=3,
-            fecha_reserva=date.today() + timedelta(days=5),
-            hora_reserva=time(18, 30),
-            estado=EstadoReservaEnum.PENDIENTE,
-        )
-        db.add_all([reserva1, reserva2])
-        db.commit()
-
-        # Asignar mesas a reservas (sin campo prioridad, se calcula dinámicamente)
-        db.add_all(
-            [
-                ReservaMesa(
-                    id_reserva=reserva1.id,
-                    id_mesa=1,
-                ),
-                ReservaMesa(
-                    id_reserva=reserva2.id,
-                    id_mesa=6,
-                ),
-            ]
-        )
-        db.commit()
-        logger.info("    ✓ Reservas insertadas")
-    else:
-        logger.info("    Reservas ya existen")
+    """
+    NO creamos Reservas en seeds.
+    Las reservas se crean en tiempo real mediante endpoints:
+    - Cliente: POST /api/cliente/reservas
+    - Se confirman desde el dashboard del mesero
+    """
+    logger.info("  → Reservas: Se crean en tiempo real (no en seeds)")
