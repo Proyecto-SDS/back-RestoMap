@@ -248,7 +248,12 @@ def eliminar_mesa(mesa_id, user_id, user_rol, id_local):
 @requerir_empleado
 @requerir_roles_empresa("gerente", "mesero")
 def generar_qr_mesa(mesa_id, user_id, user_rol, id_local):
-    """Generar QR dinámico para una mesa"""
+    """Generar QR dinámico para una mesa - crea registro en BD"""
+    import secrets
+    from datetime import datetime, timedelta
+
+    from models.models import QRDinamico
+
     db = get_session()
     try:
         stmt = select(Mesa).where(Mesa.id == mesa_id, Mesa.id_local == id_local)
@@ -257,14 +262,67 @@ def generar_qr_mesa(mesa_id, user_id, user_rol, id_local):
         if not mesa:
             return jsonify({"error": "Mesa no encontrada"}), 404
 
-        qr_data = {
-            "mesa_id": mesa.id,
-            "mesa_nombre": mesa.nombre,
-            "local_id": id_local,
-            "url": f"/menu/{id_local}?mesa={mesa.id}",
-        }
+        # Verificar si ya hay un QR activo para esta mesa
+        stmt_qr = select(QRDinamico).where(
+            QRDinamico.id_mesa == mesa_id,
+            QRDinamico.activo.is_(True),
+        )
+        qr_existente = db.execute(stmt_qr).scalar_one_or_none()
 
-        return jsonify({"message": "QR generado", "qr": qr_data}), 200
+        if qr_existente:
+            # Verificar si no ha expirado
+            if qr_existente.expiracion and qr_existente.expiracion > datetime.now(
+                qr_existente.expiracion.tzinfo
+            ):
+                # Retornar QR existente
+                return jsonify(
+                    {
+                        "message": "QR activo existente",
+                        "qr": {
+                            "codigo": qr_existente.codigo,
+                            "mesa_id": mesa.id,
+                            "mesa_nombre": mesa.nombre,
+                            "local_id": id_local,
+                            "expiracion": qr_existente.expiracion.isoformat(),
+                            "url": f"/pedido?qr={qr_existente.codigo}",
+                        },
+                    }
+                ), 200
+            else:
+                # Desactivar QR expirado
+                qr_existente.activo = False
+
+        # Generar nuevo codigo unico
+        codigo = f"QR-{secrets.token_urlsafe(8).upper()}"
+
+        # Expiracion: 4 horas desde ahora
+        expiracion = datetime.now() + timedelta(hours=4)
+
+        # Crear nuevo QR
+        nuevo_qr = QRDinamico(
+            id_mesa=mesa_id,
+            id_usuario=user_id,
+            codigo=codigo,
+            expiracion=expiracion,
+            activo=True,
+        )
+        db.add(nuevo_qr)
+        db.commit()
+        db.refresh(nuevo_qr)
+
+        return jsonify(
+            {
+                "message": "QR generado exitosamente",
+                "qr": {
+                    "codigo": nuevo_qr.codigo,
+                    "mesa_id": mesa.id,
+                    "mesa_nombre": mesa.nombre,
+                    "local_id": id_local,
+                    "expiracion": expiracion.isoformat(),
+                    "url": f"/pedido?qr={nuevo_qr.codigo}",
+                },
+            }
+        ), 201
     finally:
         db.close()
 

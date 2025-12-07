@@ -90,7 +90,7 @@ class EstadoPedidoEnum(str, PyEnum):
     """Estados de un pedido - ACTUALIZADO según auditoría"""
 
     INICIADO = "iniciado"  # Pedido creado desde QR
-    RECEPCION = "recepcion"  # Pedido recibido en cocina
+    RECEPCION = "recepcion"  # Pedido recibido
     EN_PROCESO = "en_proceso"  # Se está preparando
     TERMINADO = "terminado"  # Listo para servir
     COMPLETADO = "completado"  # Pagado y cerrado

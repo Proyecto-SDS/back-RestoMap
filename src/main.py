@@ -9,6 +9,7 @@ from flask_cors import CORS
 from config import Config, get_logger, setup_logging
 from database import db_session
 from middleware import register_middleware
+from websockets import init_socketio, socketio
 
 # Configurar logging centralizado
 setup_logging()
@@ -60,6 +61,10 @@ def create_app(config: Config | None = None) -> Flask:
     logger.info(f"Entorno: {config.ENV}")
     logger.info(f"Debug: {config.DEBUG}")
     logger.info(f"CORS permitido desde: {', '.join(config.ALLOWED_ORIGINS)}")
+
+    # Inicializar WebSockets
+    init_socketio(app)
+    logger.info("WebSockets (Flask-SocketIO) inicializado")
 
     return app
 
@@ -167,6 +172,7 @@ def _register_blueprints(app: Flask) -> None:
     # Importar blueprints
     from routes import locales_bp
     from routes.auth import auth_bp
+    from routes.cliente import cliente_bp
     from routes.empresa import empresa_bp
     from routes.favoritos import favoritos_bp
     from routes.invitaciones import invitaciones_bp
@@ -182,6 +188,7 @@ def _register_blueprints(app: Flask) -> None:
         (favoritos_bp, "favoritos"),
         (empresa_bp, "empresa"),
         (invitaciones_bp, "invitaciones"),
+        (cliente_bp, "cliente"),
     ]
 
     for blueprint, name in blueprints:
@@ -263,11 +270,11 @@ if __name__ == "__main__":
         logger.warning("Ejecutando Flask development server en produccion.")
         logger.warning("Se recomienda usar Gunicorn o uWSGI en produccion.")
 
-    # Ejecutar servidor de desarrollo
-    app.run(
+    # Ejecutar servidor con SocketIO
+    socketio.run(
+        app,
         host="0.0.0.0",
         port=Config.PORT,
         debug=Config.DEBUG,
-        use_reloader=Config.DEBUG,  # Auto-reload solo en desarrollo
-        threaded=True,  # Permite múltiples requests concurrentes
+        use_reloader=Config.DEBUG,
     )
