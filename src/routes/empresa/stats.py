@@ -58,7 +58,7 @@ def stats_dashboard(user_id, user_rol, id_local):
             or 0
         )
 
-        # Pedidos
+        # Pedidos - Todos los pedidos activos (que no estan completados ni cancelados)
         pedidos_en_proceso = (
             db.execute(
                 select(func.count())
@@ -70,6 +70,8 @@ def stats_dashboard(user_id, user_rol, id_local):
                             EstadoPedidoEnum.INICIADO,
                             EstadoPedidoEnum.RECEPCION,
                             EstadoPedidoEnum.EN_PROCESO,
+                            EstadoPedidoEnum.TERMINADO,
+                            EstadoPedidoEnum.SERVIDO,
                         ]
                     ),
                 )

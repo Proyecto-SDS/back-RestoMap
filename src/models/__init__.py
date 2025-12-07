@@ -65,6 +65,7 @@ from .models import (
     RolEnum,
     # ============ Schemas Pydantic ============
     RolSchema,
+    TipoCategoria,
     TipoFoto,
     TipoHorarioEnum,
     TipoLocal,
@@ -87,6 +88,7 @@ __all__ = [  # noqa: RUF022
     "TipoLocal",
     "TipoRed",
     "TipoFoto",
+    "TipoCategoria",
     "Categoria",
     # Modelos - Ubicacion
     "Direccion",

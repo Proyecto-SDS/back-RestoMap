@@ -93,6 +93,7 @@ class EstadoPedidoEnum(str, PyEnum):
     RECEPCION = "recepcion"  # Pedido recibido
     EN_PROCESO = "en_proceso"  # Se está preparando
     TERMINADO = "terminado"  # Listo para servir
+    SERVIDO = "servido"  # Mesero confirma entrega
     COMPLETADO = "completado"  # Pagado y cerrado
     CANCELADO = "cancelado"
 
@@ -103,6 +104,7 @@ class EstadoPedidoEnum(str, PyEnum):
             (cls.RECEPCION, "Recepción"),
             (cls.EN_PROCESO, "En Proceso"),
             (cls.TERMINADO, "Terminado"),
+            (cls.SERVIDO, "Servido"),
             (cls.COMPLETADO, "Completado"),
             (cls.CANCELADO, "Cancelado"),
         ]
@@ -121,7 +123,8 @@ class EstadoPedidoEnum(str, PyEnum):
             cls.INICIADO: [cls.RECEPCION, cls.CANCELADO],
             cls.RECEPCION: [cls.EN_PROCESO, cls.CANCELADO],
             cls.EN_PROCESO: [cls.TERMINADO, cls.CANCELADO],
-            cls.TERMINADO: [cls.COMPLETADO],
+            cls.TERMINADO: [cls.SERVIDO, cls.CANCELADO],
+            cls.SERVIDO: [cls.COMPLETADO],
             cls.COMPLETADO: [],
             cls.CANCELADO: [],
         }
@@ -387,12 +390,34 @@ class TipoFoto(Base):
     fotos = relationship("Foto", back_populates="tipo_foto", lazy="select")
 
 
+class TipoCategoria(Base):
+    """Tipo de categoria: Comida o Bebida - para filtrar en cocina/barra"""
+
+    __tablename__ = "tipo_categoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(50), nullable=False, unique=True)
+
+    categorias = relationship(
+        "Categoria", back_populates="tipo_categoria", lazy="select"
+    )
+
+
 class Categoria(Base):
     __tablename__ = "categoria"
 
     id = Column(Integer, primary_key=True, index=True)
+    id_tipo_categoria = Column(
+        Integer,
+        ForeignKey("tipo_categoria.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     nombre = Column(String(100), nullable=False, unique=True)
 
+    tipo_categoria = relationship(
+        "TipoCategoria", back_populates="categorias", lazy="joined"
+    )
     productos = relationship("Producto", back_populates="categoria", lazy="selectin")
     fotos = relationship("Foto", back_populates="categoria", lazy="selectin")
 

@@ -1,5 +1,5 @@
 from config import get_logger
-from models import Categoria, Comuna, TipoFoto, TipoLocal, TipoRed
+from models import Categoria, Comuna, TipoCategoria, TipoFoto, TipoLocal, TipoRed
 
 logger = get_logger(__name__)
 
@@ -98,22 +98,38 @@ def create_catalogs(db):
     else:
         logger.info("    Tipos de Fotos ya existen")
 
-    # ============ Categorias de Productos ============
-    logger.info("  → Insertando Categorias de Productos...")
-    if db.query(Categoria).count() == 0:
+    # ============ Tipos de Categoria ============
+    logger.info("  -> Insertando Tipos de Categoria...")
+    if db.query(TipoCategoria).count() == 0:
         db.add_all(
             [
-                Categoria(nombre="Entradas"),
-                Categoria(nombre="Platos Principales"),
-                Categoria(nombre="Postres"),
-                Categoria(nombre="Bebidas"),
-                Categoria(nombre="Cervezas"),
-                Categoria(nombre="Vinos"),
-                Categoria(nombre="Cocteles"),
-                Categoria(nombre="Cafés"),
+                TipoCategoria(id=1, nombre="Comida"),
+                TipoCategoria(id=2, nombre="Bebida"),
             ]
         )
         db.commit()
-        logger.info("    ✓ Categorias insertadas")
+        logger.info("    Tipos de Categoria insertados")
+    else:
+        logger.info("    Tipos de Categoria ya existen")
+
+    # ============ Categorias de Productos ============
+    logger.info("  -> Insertando Categorias de Productos...")
+    if db.query(Categoria).count() == 0:
+        db.add_all(
+            [
+                # Comida (id_tipo_categoria=1)
+                Categoria(nombre="Entradas", id_tipo_categoria=1),
+                Categoria(nombre="Platos Principales", id_tipo_categoria=1),
+                Categoria(nombre="Postres", id_tipo_categoria=1),
+                # Bebida (id_tipo_categoria=2)
+                Categoria(nombre="Bebidas", id_tipo_categoria=2),
+                Categoria(nombre="Cervezas", id_tipo_categoria=2),
+                Categoria(nombre="Vinos", id_tipo_categoria=2),
+                Categoria(nombre="Cocteles", id_tipo_categoria=2),
+                Categoria(nombre="Cafes", id_tipo_categoria=2),
+            ]
+        )
+        db.commit()
+        logger.info("    Categorias insertadas")
     else:
         logger.info("    Categorias ya existen")

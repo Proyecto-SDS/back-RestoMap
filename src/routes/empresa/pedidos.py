@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from database import get_session
-from models.models import Cuenta, EstadoPedidoEnum, Pedido
+from models.models import Cuenta, EstadoPedidoEnum, Pedido, Producto
 from routes.empresa import requerir_empleado, requerir_roles_empresa
 from utils.jwt_helper import requerir_auth
 from websockets import emit_estado_pedido
@@ -218,11 +218,11 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
 @requerir_empleado
 @requerir_roles_empresa("gerente", "cocinero")
 def pedidos_cocina(user_id, user_rol, id_local):
-    """Listar pedidos para la cocina"""
+    """Listar pedidos para la cocina - Solo productos tipo Comida"""
     estados_cocina = [
-        EstadoPedidoEnum.INICIADO,
         EstadoPedidoEnum.RECEPCION,
         EstadoPedidoEnum.EN_PROCESO,
+        EstadoPedidoEnum.TERMINADO,
     ]
 
     db = get_session()
@@ -231,7 +231,9 @@ def pedidos_cocina(user_id, user_rol, id_local):
             select(Pedido)
             .options(
                 joinedload(Pedido.mesa),
-                joinedload(Pedido.cuentas).joinedload(Cuenta.producto),
+                joinedload(Pedido.cuentas)
+                .joinedload(Cuenta.producto)
+                .joinedload(Producto.categoria),
             )
             .where(Pedido.id_local == id_local, Pedido.estado.in_(estados_cocina))
             .order_by(Pedido.creado_el.asc())
@@ -243,30 +245,36 @@ def pedidos_cocina(user_id, user_rol, id_local):
         for pedido in pedidos:
             lineas = []
             for cuenta in pedido.cuentas:
-                lineas.append(
+                # Solo incluir productos tipo Comida (id_tipo_categoria=1)
+                if (
+                    cuenta.producto
+                    and cuenta.producto.categoria
+                    and cuenta.producto.categoria.id_tipo_categoria == 1
+                ):
+                    lineas.append(
+                        {
+                            "id": cuenta.id,
+                            "producto_id": cuenta.id_producto,
+                            "producto_nombre": cuenta.producto.nombre,
+                            "cantidad": cuenta.cantidad,
+                            "observaciones": cuenta.observaciones,
+                        }
+                    )
+
+            # Solo agregar pedido si tiene lineas de comida
+            if lineas:
+                result.append(
                     {
-                        "id": cuenta.id,
-                        "producto_id": cuenta.id_producto,
-                        "producto_nombre": cuenta.producto.nombre
-                        if cuenta.producto
-                        else "Producto eliminado",
-                        "cantidad": cuenta.cantidad,
-                        "observaciones": cuenta.observaciones,
+                        "id": pedido.id,
+                        "id_mesa": pedido.id_mesa,
+                        "mesa_nombre": pedido.mesa.nombre if pedido.mesa else None,
+                        "estado": pedido.estado.value if pedido.estado else None,
+                        "creado_el": pedido.creado_el.isoformat()
+                        if pedido.creado_el
+                        else None,
+                        "lineas": lineas,
                     }
                 )
-
-            result.append(
-                {
-                    "id": pedido.id,
-                    "id_mesa": pedido.id_mesa,
-                    "mesa_nombre": pedido.mesa.nombre if pedido.mesa else None,
-                    "estado": pedido.estado.value if pedido.estado else None,
-                    "creado_el": pedido.creado_el.isoformat()
-                    if pedido.creado_el
-                    else None,
-                    "lineas": lineas,
-                }
-            )
 
         return jsonify(result), 200
     finally:
@@ -278,11 +286,11 @@ def pedidos_cocina(user_id, user_rol, id_local):
 @requerir_empleado
 @requerir_roles_empresa("gerente", "bartender")
 def pedidos_barra(user_id, user_rol, id_local):
-    """Listar pedidos para la barra"""
+    """Listar pedidos para la barra - Solo productos tipo Bebida"""
     estados_barra = [
-        EstadoPedidoEnum.INICIADO,
         EstadoPedidoEnum.RECEPCION,
         EstadoPedidoEnum.EN_PROCESO,
+        EstadoPedidoEnum.TERMINADO,
     ]
 
     db = get_session()
@@ -291,7 +299,9 @@ def pedidos_barra(user_id, user_rol, id_local):
             select(Pedido)
             .options(
                 joinedload(Pedido.mesa),
-                joinedload(Pedido.cuentas).joinedload(Cuenta.producto),
+                joinedload(Pedido.cuentas)
+                .joinedload(Cuenta.producto)
+                .joinedload(Producto.categoria),
             )
             .where(Pedido.id_local == id_local, Pedido.estado.in_(estados_barra))
             .order_by(Pedido.creado_el.asc())
@@ -303,18 +313,23 @@ def pedidos_barra(user_id, user_rol, id_local):
         for pedido in pedidos:
             lineas = []
             for cuenta in pedido.cuentas:
-                lineas.append(
-                    {
-                        "id": cuenta.id,
-                        "producto_id": cuenta.id_producto,
-                        "producto_nombre": cuenta.producto.nombre
-                        if cuenta.producto
-                        else "Producto eliminado",
-                        "cantidad": cuenta.cantidad,
-                        "observaciones": cuenta.observaciones,
-                    }
-                )
+                # Solo incluir productos tipo Bebida (id_tipo_categoria=2)
+                if (
+                    cuenta.producto
+                    and cuenta.producto.categoria
+                    and cuenta.producto.categoria.id_tipo_categoria == 2
+                ):
+                    lineas.append(
+                        {
+                            "id": cuenta.id,
+                            "producto_id": cuenta.id_producto,
+                            "producto_nombre": cuenta.producto.nombre,
+                            "cantidad": cuenta.cantidad,
+                            "observaciones": cuenta.observaciones,
+                        }
+                    )
 
+            # Solo agregar pedido si tiene lineas de bebida
             if lineas:
                 result.append(
                     {
