@@ -84,7 +84,7 @@ jobs:
       run: |
         gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev
         IMAGE_URI=${GCP_REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest
-        docker build -f dockerfile.backend -t $IMAGE_URI .
+        docker build -f Dockerfile -t $IMAGE_URI .
         docker push $IMAGE_URI
         echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
