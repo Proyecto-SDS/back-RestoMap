@@ -169,7 +169,11 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
 
     db = get_session()
     try:
-        stmt = select(Pedido).where(Pedido.id == pedido_id, Pedido.id_local == id_local)
+        stmt = (
+            select(Pedido)
+            .options(joinedload(Pedido.qr))
+            .where(Pedido.id == pedido_id, Pedido.id_local == id_local)
+        )
         pedido = db.execute(stmt).scalar_one_or_none()
 
         if not pedido:
@@ -185,6 +189,14 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
             ), 400
 
         pedido.estado = data.estado
+
+        # Desactivar QR si el pedido terminó (completado o cancelado)
+        if (
+            data.estado in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]
+            and pedido.qr
+        ):
+            pedido.qr.activo = False
+
         db.commit()
 
         # Emitir evento WebSocket - Estado del pedido actualizado

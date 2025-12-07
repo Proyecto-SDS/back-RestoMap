@@ -17,9 +17,11 @@ from models.models import (
     EstadoPedidoEnum,
     Mesa,
     Pedido,
+    QRDinamico,
 )
 from routes.empresa import requerir_empleado, requerir_roles_empresa
 from utils.jwt_helper import requerir_auth
+from websockets import emit_estado_pedido, emit_mesa_actualizada
 
 mesas_bp = Blueprint("mesas", __name__, url_prefix="/mesas")
 
@@ -310,8 +312,6 @@ def generar_qr_mesa(mesa_id, user_id, user_rol, id_local):
     import secrets
     from datetime import datetime, timedelta
 
-    from models.models import QRDinamico
-
     db = get_session()
     try:
         # Validar request body
@@ -598,23 +598,45 @@ def cancelar_mesa(mesa_id, user_id, user_rol, id_local):
             return jsonify({"error": "Mesa no encontrada"}), 404
 
         # Cancelar todos los pedidos activos de la mesa
-        stmt_pedidos = select(Pedido).where(
-            Pedido.id_mesa == mesa_id,
-            Pedido.id_local == id_local,
-            Pedido.estado.not_in(
-                [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]
-            ),
+        stmt_pedidos = (
+            select(Pedido)
+            .options(joinedload(Pedido.qr))
+            .where(
+                Pedido.id_mesa == mesa_id,
+                Pedido.id_local == id_local,
+                Pedido.estado.not_in(
+                    [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]
+                ),
+            )
         )
         pedidos_activos = db.execute(stmt_pedidos).scalars().all()
 
         pedidos_cancelados = 0
         for pedido in pedidos_activos:
             pedido.estado = EstadoPedidoEnum.CANCELADO
+            # Desactivar QR asociado al pedido
+            if pedido.qr:
+                pedido.qr.activo = False
             pedidos_cancelados += 1
+
+            # Emitir evento WebSocket de cancelación
+            emit_estado_pedido(id_local, pedido.id, EstadoPedidoEnum.CANCELADO.value)
+
+        # Desactivar TODOS los QRs activos de esta mesa (incluyendo los no escaneados)
+        stmt_qrs = select(QRDinamico).where(
+            QRDinamico.id_mesa == mesa_id,
+            QRDinamico.activo.is_(True),
+        )
+        qrs_activos = db.execute(stmt_qrs).scalars().all()
+        for qr in qrs_activos:
+            qr.activo = False
 
         # Cambiar estado de la mesa a disponible
         mesa.estado = EstadoMesaEnum.DISPONIBLE
         db.commit()
+
+        # Emitir evento de actualización de mesa
+        emit_mesa_actualizada(id_local, mesa.id, EstadoMesaEnum.DISPONIBLE.value)
 
         return jsonify(
             {
