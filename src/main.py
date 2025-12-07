@@ -271,10 +271,12 @@ if __name__ == "__main__":
         logger.warning("Se recomienda usar Gunicorn o uWSGI en produccion.")
 
     # Ejecutar servidor con SocketIO
+    # log_output=False evita logs duplicados de werkzeug (ya usamos middleware.logging)
     socketio.run(
         app,
         host="0.0.0.0",
         port=Config.PORT,
         debug=Config.DEBUG,
         use_reloader=Config.DEBUG,
+        log_output=False,
     )
