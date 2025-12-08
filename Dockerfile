@@ -65,12 +65,7 @@ COPY alembic.ini pyproject.toml ./
 COPY src ./src
 COPY scripts ./scripts
 
-RUN echo "======================================================="
-RUN echo " VERIFICANDO CONTENIDO REAL DE MAIN.PY EN EL BUILD "
-RUN echo "======================================================="
-RUN ls -la src/main.py
-RUN cat src/main.py | head -n 130 | tail -n 20
-RUN echo "======================================================="
+RUN grep -F "app.register_blueprint(locales_bp)" src/main.py && echo "!!! ALERTA: DOCKER ESTA VIENDO EL CODIGO VIEJO !!!" && exit 1 || echo ">>> EXITO: No se encontró la línea vieja."
 
 # Crear usuario no-root para seguridad (requerido por Cloud Run)
 RUN useradd -m -u 1000 appuser && \
