@@ -192,8 +192,12 @@ def _register_blueprints(app: Flask) -> None:
     ]
 
     for blueprint, name in blueprints:
-        app.register_blueprint(blueprint)
-        logger.info(f"  Blueprint '{name}' registrado")
+        # Registrar blueprint usando un nombre único en la app para evitar
+        # colisiones si el mismo nombre ya fue importado/registrado en otro
+        # contexto (por ejemplo importaciones duplicadas al desplegar).
+        unique_name = f"bp_{name}"
+        app.register_blueprint(blueprint, name=unique_name)
+        logger.info(f"  Blueprint '{name}' registrado como '{unique_name}'")
 
     logger.info(f"{len(blueprints)} blueprints registrados")
 
