@@ -1,9 +1,18 @@
-name: Despliegue BACK PRODUCCIÓN
+name: Despliegue BACK PRODUCCIÓN (Manual/Auto)
 
 on:
+  # Opción 1: Automático cuando se hace push a main
   push:
-    branches: [ "main" ] 
+    branches: [ "main" ]
+  
+  # Opción 2: Manual eligiendo la rama
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Rama a desplegar (ej: main, develop, fix/algo)'
+        required: true
+        default: 'main'
+        type: string
 
 env:
   PROJECT_ID: 'restomap-478918'
@@ -11,6 +20,7 @@ env:
   REPO_NAME: 'repo'
   SQL_INSTANCE_CONNECTION_NAME: 'restomap-478918:us-central1:restomap'
   SERVICE_NAME: 'backend-prod'
+  # Secretos
   DB_USER_SECRET: ${{ secrets.DB_USER }} 
   DB_PASS_SECRET: ${{ secrets.DB_PASSWORD }}
   DB_NAME_SECRET: ${{ secrets.DB_NAME }}
@@ -25,22 +35,22 @@ jobs:
     steps:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v4
+        with:
+          # MAGIA AQUÍ: Si es manual usa el input, si es automático usa la referencia del push
+          ref: ${{ inputs.branch || github.ref }}
 
-      # ==================================================================
-      # NUEVO PASO DE DEBUG: Muestra el código ANTES de entrar a Docker
-      # ==================================================================
-      - name: 🕵️ DEBUG: VERIFICAR CÓDIGO (Líneas 110-140)
+      # =========================================================
+      # PASO DE DEBUG: Verificamos qué código acabamos de bajar
+      # =========================================================
+      - name: 🕵️ DEBUG - Verificar código descargado
         run: |
-          echo "========================================================"
-          echo "ESTO ES LO QUE GITHUB DESCARGÓ DEL REPO:"
-          echo "========================================================"
-          ls -R src/
-          echo "--------------------------------------------------------"
-          echo "CONTENIDO DE src/main.py (Líneas clave):"
-          echo "--------------------------------------------------------"
-          # Muestra de la línea 110 a la 140 donde ocurre el error
-          cat src/main.py | sed -n '110,140p' 
-          echo "========================================================"
+          echo "RAMA DESPLEGADA: ${{ inputs.branch || github.ref_name }}"
+          echo "----------------------------------------"
+          echo "Verificando src/main.py (Líneas clave):"
+          ls -la src/main.py
+          # Muestra las líneas donde solía estar el error
+          cat src/main.py | sed -n '110,140p'
+          echo "----------------------------------------"
 
       - name: 🔑 Autenticación con GCP
         uses: google-github-actions/auth@v2
@@ -56,10 +66,15 @@ jobs:
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev
           
-          IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          # Usamos el SHA corto para el tag si es push, o 'manual' si es dispatch
+          TAG_VERSION="${{ github.sha }}"
+          
+          IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${TAG_VERSION}"
           LATEST_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest"
 
-          # Usamos --no-cache para asegurar que no use capas viejas
+          echo "Construyendo desde rama: ${{ inputs.branch || github.ref_name }}"
+
+          # Construimos usando el Dockerfile de producción y SIN caché
           docker build --no-cache -f Dockerfile -t $IMAGE_TAG -t $LATEST_TAG .
           
           docker push $IMAGE_TAG
@@ -67,37 +82,12 @@ jobs:
           
           echo "image_uri=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: 🚀 Deploy Cloud Run (Producción)
+      - name: 🚀 Deploy Cloud Run
         id: deploy
         run: |
+          # Crear archivo de variables seguro
           cat <<EOF > env_vars_prod.yaml
           ENV: production
           DB_HOST: /cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }}
           DB_USER: ${{ env.DB_USER_SECRET }}
-          DB_NAME: ${{ env.DB_NAME_SECRET }}
-          DB_PASSWORD: ${{ env.DB_PASS_SECRET }}
-          SEED_KEY: ${{ secrets.SEED_KEY }}
-          EOF
-          
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ steps.build-push.outputs.image_uri }} \
-            --region ${{ env.GCP_REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --min-instances 1 \
-            --max-instances 10 \
-            --cpu 1 \
-            --memory 512Mi \
-            --service-account 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com' \
-            --add-cloudsql-instances "${{ env.SQL_INSTANCE_CONNECTION_NAME }}" \
-            --env-vars-file env_vars_prod.yaml \
-            --quiet
-            
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format 'value(status.url)')
-          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
-
-      - name: ✅ Resumen del Despliegue
-        run: |
-          echo "### 🚀 Producción Desplegada Exitosamente"
-          echo "La nueva versión está activa en:"
-          echo "🔗 [${{ steps.deploy.outputs.service_url }}](${{ steps.deploy.outputs.service_url }})"
+          DB_NAME:
