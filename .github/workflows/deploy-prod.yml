@@ -47,7 +47,7 @@ jobs:
           LATEST_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest"
           
           # Construimos la imagen usando el Dockerfile corregido (dockerfile.backend)
-          docker build -f dockerfile.backend -t $IMAGE_TAG -t $LATEST_TAG .
+          docker build -f Dockerfile -t $IMAGE_TAG -t $LATEST_TAG .
           
           # Subimos ambas etiquetas
           docker push $IMAGE_TAG
