@@ -17,8 +17,9 @@ from models import (
     ReservaMesa,
 )
 
-# Crear el Blueprint
-locales_bp = Blueprint("locales", __name__, url_prefix="/api/locales")
+# Crear el Blueprint (nombre interno distinto para evitar colisiones en runtime)
+# Usamos 'bp_locales' como nombre interno; el `url_prefix` permanece igual.
+locales_bp = Blueprint("bp_locales", __name__, url_prefix="/api/locales")
 
 
 @locales_bp.route("/", methods=["GET"])
