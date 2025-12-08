@@ -3,7 +3,7 @@ Punto de entrada principal de la aplicacion Flask
 Backend - Sistema de Gestion de Locales
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config, get_logger, setup_logging
@@ -249,6 +249,24 @@ def _register_basic_routes(app: Flask) -> None:
         ), 200
 
     logger.info("Rutas básicas registradas (/health, /api)")
+
+    @app.route("/debug/blueprints")
+    def debug_blueprints():
+        """
+        Endpoint de debug temporal que devuelve los blueprints registrados.
+
+        En `ENV=production` exige el query param `key` igual a `SEED_KEY`.
+        Esto permite verificar en runtime si la imagen desplegada contiene
+        los cambios esperados (por ejemplo el nombre del blueprint).
+        """
+        # Proteccion en produccion
+        if app.config.get("ENV") == "production":
+            provided = request.args.get("key")
+            secret = app.config.get("SEED_KEY")
+            if not secret or provided != secret:
+                return jsonify({"error": "forbidden"}), 403
+
+        return jsonify(sorted(list(app.blueprints.keys()))), 200
 
 
 # Crear instancia de la aplicacion
