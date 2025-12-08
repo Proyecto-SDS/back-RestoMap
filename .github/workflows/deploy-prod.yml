@@ -45,9 +45,8 @@ jobs:
           # Etiquetas: SHA para trazabilidad y 'latest' para facilidad
           IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           LATEST_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest"
-          
-          # Construimos la imagen usando el Dockerfile corregido (dockerfile.backend)
-          docker build -f Dockerfile -t $IMAGE_TAG -t $LATEST_TAG .
+
+          docker build --no-cache -f Dockerfile -t $IMAGE_TAG -t $LATEST_TAG .
           
           # Subimos ambas etiquetas
           docker push $IMAGE_TAG
