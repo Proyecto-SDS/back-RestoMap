@@ -88,11 +88,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 EXPOSE ${PORT}
 
 # Comando para ejecutar con Gunicorn + Eventlet
-# - worker-class eventlet: habilita soporte WebSocket
-# - workers: 1 para demo (eventlet maneja concurrencia internamente)
-# - timeout: 0 para Cloud Run (maneja timeouts externamente)
-CMD exec gunicorn \
-    --bind 0.0.0.0:${PORT} \
+# Usar forma JSON y expansión de shell para garantizar que la variable
+# `PORT` se evalúe en tiempo de ejecución y tenga un fallback a 8080.
+# Esto evita problemas cuando la imagen anterior no tenía PORT o Cloud Run
+# no la inyectó correctamente.
+CMD ["sh", "-c", "exec gunicorn \
+    --bind 0.0.0.0:${PORT:-8080} \
     --worker-class eventlet \
     --workers 1 \
     --timeout 0 \
@@ -100,4 +101,4 @@ CMD exec gunicorn \
     --error-logfile - \
     --capture-output \
     --enable-stdio-inheritance \
-    src.main:app
+    src.main:app"]
