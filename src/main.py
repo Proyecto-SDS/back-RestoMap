@@ -1,6 +1,7 @@
 """
 Punto de entrada principal de la aplicacion Flask
 Backend - Sistema de Gestion de Locales
+VERSION: DEBUG_CACHE_TEST_01  <-- Agrega esto
 """
 
 from flask import Flask, jsonify, request
