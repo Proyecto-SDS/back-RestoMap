@@ -87,17 +87,15 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 # Exponer puerto (Cloud Run usa PORT env var, default 8080)
 EXPOSE ${PORT}
 
-# Comando para ejecutar con Gunicorn
-# - workers: 2 para Cloud Run (memory-efficient)
-# - threads: 4 para concurrencia
+# Comando para ejecutar con Gunicorn + Eventlet
+# - worker-class eventlet: habilita soporte WebSocket
+# - workers: 1 para demo (eventlet maneja concurrencia internamente)
 # - timeout: 0 para Cloud Run (maneja timeouts externamente)
-# - preload: carga la app antes de fork (ahorra memoria)
 CMD exec gunicorn \
     --bind 0.0.0.0:${PORT} \
-    --workers 2 \
-    --threads 4 \
+    --worker-class eventlet \
+    --workers 1 \
     --timeout 0 \
-    --preload \
     --access-logfile - \
     --error-logfile - \
     --capture-output \

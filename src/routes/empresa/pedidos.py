@@ -4,6 +4,7 @@ Prefix: /api/empresa/pedidos/*
 """
 
 import contextlib
+from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
@@ -11,10 +12,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from database import get_session
-from models.models import Cuenta, EstadoPedidoEnum, Pedido, Producto
+from models.models import (
+    TIEMPO_EXTENSION_POR_ESTADO,
+    Cuenta,
+    EstadoPedidoEnum,
+    Pedido,
+    Producto,
+)
 from routes.empresa import requerir_empleado, requerir_roles_empresa
 from utils.jwt_helper import requerir_auth
-from websockets import emit_estado_pedido
+from websockets import emit_estado_pedido, emit_expiracion_actualizada
 
 pedidos_bp = Blueprint("pedidos", __name__, url_prefix="/pedidos")
 
@@ -190,6 +197,12 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
 
         pedido.estado = data.estado
 
+        # Extender expiración si cambia a EN_PROCESO
+        if data.estado == EstadoPedidoEnum.EN_PROCESO:
+            pedido.expiracion = (pedido.expiracion or datetime.now()) + timedelta(
+                minutes=TIEMPO_EXTENSION_POR_ESTADO[EstadoPedidoEnum.EN_PROCESO]
+            )
+
         # Desactivar QR si el pedido terminó (completado o cancelado)
         if (
             data.estado in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]
@@ -202,11 +215,80 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
         # Emitir evento WebSocket - Estado del pedido actualizado
         with contextlib.suppress(Exception):
             emit_estado_pedido(id_local, pedido.id, data.estado.value)
+            # Si cambió la expiración, notificar para actualizar timer
+            if data.estado == EstadoPedidoEnum.EN_PROCESO and pedido.id_mesa:
+                emit_expiracion_actualizada(
+                    id_local,
+                    pedido.id_mesa,
+                    pedido.expiracion.isoformat() if pedido.expiracion else None,
+                )
 
         return jsonify(
             {
                 "message": "Estado del pedido actualizado",
                 "pedido": {"id": pedido.id, "estado": pedido.estado.value},
+            }
+        ), 200
+    finally:
+        db.close()
+
+
+@pedidos_bp.route("/<int:pedido_id>/extender", methods=["POST"])
+@requerir_auth
+@requerir_empleado
+@requerir_roles_empresa("gerente", "mesero")
+def extender_tiempo_pedido(pedido_id, user_id, user_rol, id_local):
+    """
+    Extender tiempo de expiración del pedido.
+
+    Body (opcional):
+        { "minutos": 5 }  # Default: 5, máximo: 30
+    """
+    db = get_session()
+    try:
+        # Obtener minutos del body (default 5, máximo 30)
+        data = request.get_json() or {}
+        minutos = min(data.get("minutos", 5), 30)
+
+        stmt = select(Pedido).where(Pedido.id == pedido_id, Pedido.id_local == id_local)
+        pedido = db.execute(stmt).scalar_one_or_none()
+
+        if not pedido:
+            return jsonify({"error": "Pedido no encontrado"}), 404
+
+        # Permitir extender en cualquier estado activo
+        if pedido.estado in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]:
+            return jsonify(
+                {
+                    "error": "No se puede extender tiempo de pedido finalizado",
+                    "estado_actual": pedido.estado.value if pedido.estado else None,
+                }
+            ), 400
+
+        # Extender tiempo
+        pedido.expiracion = (pedido.expiracion or datetime.now()) + timedelta(
+            minutes=minutos
+        )
+        db.commit()
+
+        # Emitir evento para actualizar timer en frontend
+        if pedido.id_mesa:
+            with contextlib.suppress(Exception):
+                emit_expiracion_actualizada(
+                    id_local,
+                    pedido.id_mesa,
+                    pedido.expiracion.isoformat() if pedido.expiracion else None,
+                )
+
+        return jsonify(
+            {
+                "message": f"Tiempo extendido +{minutos} minutos",
+                "pedido": {
+                    "id": pedido.id,
+                    "expiracion": pedido.expiracion.isoformat()
+                    if pedido.expiracion
+                    else None,
+                },
             }
         ), 200
     finally:
@@ -271,6 +353,9 @@ def pedidos_cocina(user_id, user_rol, id_local):
                         "estado": pedido.estado.value if pedido.estado else None,
                         "creado_el": pedido.creado_el.isoformat()
                         if pedido.creado_el
+                        else None,
+                        "actualizado_el": pedido.actualizado_el.isoformat()
+                        if pedido.actualizado_el
                         else None,
                         "lineas": lineas,
                     }
@@ -339,6 +424,9 @@ def pedidos_barra(user_id, user_rol, id_local):
                         "estado": pedido.estado.value if pedido.estado else None,
                         "creado_el": pedido.creado_el.isoformat()
                         if pedido.creado_el
+                        else None,
+                        "actualizado_el": pedido.actualizado_el.isoformat()
+                        if pedido.actualizado_el
                         else None,
                         "lineas": lineas,
                     }

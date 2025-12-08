@@ -131,6 +131,16 @@ class EstadoPedidoEnum(str, PyEnum):
         return estado_nuevo in transiciones.get(estado_actual, [])
 
 
+# Tiempos de extensión por estado (en minutos)
+# Estos tiempos se ACUMULAN al cambiar de estado
+TIEMPO_EXTENSION_POR_ESTADO = {
+    EstadoPedidoEnum.INICIADO: 15,  # Al escanear QR
+    EstadoPedidoEnum.RECEPCION: 45,  # Al agregar productos
+    EstadoPedidoEnum.EN_PROCESO: 15,  # Al comenzar preparación
+    # TERMINADO y SERVIDO no extienden, solo generan alertas
+}
+
+
 # ============================================
 # ENUMS - SECCIÓN 3: MESA Y RESERVA
 # ============================================
@@ -973,7 +983,7 @@ class QRDinamico(Base):
         index=True,
     )
     codigo = Column(String(255), nullable=False, unique=True, index=True)
-    expiracion = Column(DateTime(timezone=True), nullable=False)
+    expiracion = Column(DateTime(timezone=True), nullable=True)
     activo = Column(Boolean, default=True, nullable=False, index=True)
     num_personas = Column(SmallInteger, nullable=True, default=None)
     creado_el = Column(
@@ -1038,6 +1048,7 @@ class Pedido(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     actualizado_el = Column(DateTime(timezone=True), onupdate=func.now())
+    expiracion = Column(DateTime(timezone=True), nullable=True, index=True)
 
     local = relationship("Local", back_populates="pedidos", lazy="joined")
     mesa = relationship("Mesa", back_populates="pedidos", lazy="joined")

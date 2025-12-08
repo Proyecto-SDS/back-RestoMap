@@ -4,6 +4,8 @@ Exporta todos los modelos, schemas y enums para facilitar importaciones
 """
 
 from .models import (
+    # ============ Constantes ============
+    TIEMPO_EXTENSION_POR_ESTADO,
     # ============ Base ============
     Base,
     Categoria,
@@ -152,4 +154,6 @@ __all__ = [  # noqa: RUF022
     "obtener_etiqueta",
     "obtener_prioridad_reserva",
     "validar_transicion_estado",
+    # Constantes
+    "TIEMPO_EXTENSION_POR_ESTADO",
 ]

@@ -20,6 +20,9 @@ RESET = "\033[0m"
 # Dict para guardar info de usuarios conectados por socket id
 connected_users: dict[str, dict] = {}
 
+# Dict para rastrear conexiones por local (para saber cuándo iniciar/detener verificador)
+conexiones_por_local: dict[int, set[str]] = {}
+
 
 def get_user_info(sid: str | None = None) -> str:
     """Obtiene la info formateada del usuario conectado."""
@@ -28,6 +31,11 @@ def get_user_info(sid: str | None = None) -> str:
     if user:
         return f"{CYAN}{user['nombre']}{RESET} ({YELLOW}{user['rol']}{RESET})"
     return "Usuario anonimo"
+
+
+def hay_conexiones_en_local(local_id: int) -> bool:
+    """Verifica si hay conexiones activas en un local."""
+    return local_id in conexiones_por_local and len(conexiones_por_local[local_id]) > 0
 
 
 @socketio.on("connect")
@@ -42,9 +50,27 @@ def handle_disconnect(*args):
     """Cliente desconectado."""
     razon = args[0] if args else "desconocida"
     user_info = get_user_info()
+    sid = request.sid  # type: ignore
+
+    # Obtener local_id del usuario si existe
+    user_data = connected_users.get(sid)
+    if user_data and "local_id" in user_data:
+        local_id = user_data["local_id"]
+        # Remover de conexiones del local
+        if local_id in conexiones_por_local:
+            conexiones_por_local[local_id].discard(sid)
+            # Si no quedan conexiones, detener verificador
+            if len(conexiones_por_local[local_id]) == 0:
+                del conexiones_por_local[local_id]
+                try:
+                    from services.verificador_pedidos import detener_verificador
+
+                    detener_verificador(local_id)
+                except Exception as e:
+                    logger.error(f"Error deteniendo verificador: {e}")
+
     # Limpiar usuario del dict
-    if request.sid in connected_users:  # type: ignore
-        del connected_users[request.sid]  # type: ignore
+    connected_users.pop(sid, None)
     logger.info(f"{user_info} {RED}desconectado{RESET}. Razon: {razon}")
 
 
@@ -75,6 +101,27 @@ def handle_join_local(data):
     if local_id:
         room = f"local_{local_id}"
         join_room(room)
+
+        sid = request.sid  # type: ignore
+
+        # Guardar local_id en datos del usuario
+        if sid in connected_users:
+            connected_users[sid]["local_id"] = local_id
+
+        # Registrar conexión al local
+        if local_id not in conexiones_por_local:
+            conexiones_por_local[local_id] = set()
+        conexiones_por_local[local_id].add(sid)
+
+        # Iniciar verificador si es la primera conexión
+        if len(conexiones_por_local[local_id]) == 1:
+            try:
+                from services.verificador_pedidos import iniciar_verificador
+
+                iniciar_verificador(local_id, lambda: hay_conexiones_en_local(local_id))
+            except Exception as e:
+                logger.error(f"Error iniciando verificador: {e}")
+
         user_info = get_user_info()
         logger.debug(f"{user_info} {GREEN}unido{RESET} a sala: {BLUE}{room}{RESET}")
         emit("joined", {"room": room})

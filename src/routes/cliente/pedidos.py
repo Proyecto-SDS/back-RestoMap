@@ -13,6 +13,7 @@ from sqlalchemy.orm import joinedload
 
 from database import get_session
 from models import (
+    TIEMPO_EXTENSION_POR_ESTADO,
     Cuenta,
     Encomienda,
     EstadoEncomiendaEnum,
@@ -26,6 +27,8 @@ from models import (
 )
 from utils.jwt_helper import requerir_auth_persona
 from websockets import (
+    emit_estado_pedido,
+    emit_expiracion_actualizada,
     emit_mesa_actualizada,
     emit_nueva_encomienda,
     emit_qr_escaneado,
@@ -99,7 +102,17 @@ def validar_qr(user_id):
         # Buscar o crear pedido activo
         pedido = qr.pedido
 
-        if not pedido:
+        if pedido:
+            # Ya existe un pedido - verificar que el usuario actual sea el dueño
+            if pedido.id_usuario != user_id:
+                return jsonify(
+                    {
+                        "error": "Este código QR ya fue utilizado por otro usuario. "
+                        "Solicita un nuevo código al mesero."
+                    }
+                ), 403
+        else:
+            # No hay pedido aún - crear uno nuevo
             # Determinar num_personas según el tipo de QR
             num_personas = None
 
@@ -114,7 +127,10 @@ def validar_qr(user_id):
                 # CASO 2 - PEDIDO: Obtener num_personas del QR
                 num_personas = qr.num_personas
 
-            # Crear nuevo pedido
+            # Crear nuevo pedido con expiración inicial (+15 min)
+            expiracion_inicial = datetime.now() + timedelta(
+                minutes=TIEMPO_EXTENSION_POR_ESTADO[EstadoPedidoEnum.INICIADO]
+            )
             pedido = Pedido(
                 id_local=mesa.id_local,
                 id_mesa=mesa.id,
@@ -124,17 +140,13 @@ def validar_qr(user_id):
                 estado=EstadoPedidoEnum.INICIADO,
                 total=0,
                 num_personas=num_personas,
+                expiracion=expiracion_inicial,
             )
             db.add(pedido)
             db.flush()
 
-            # Actualizar QR con pedido
+            # Actualizar QR con pedido (sin modificar expiración del QR)
             qr.id_pedido = pedido.id
-
-            # CASO 2 - PEDIDO: Extender expiración a 2 horas al escanear
-            # (solo si no es reserva)
-            if not qr.id_reserva:
-                qr.expiracion = datetime.now() + timedelta(hours=2)
 
             # Cambiar estado de mesa a ocupada
             mesa.estado = EstadoMesaEnum.OCUPADA
@@ -295,6 +307,20 @@ def agregar_productos(codigo, user_id):
         if pedido.estado in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]:
             return jsonify({"error": "El pedido ya fue cerrado"}), 400
 
+        # Bloquear adiciones si el pedido ya está en preparación
+        estados_bloqueados = [
+            EstadoPedidoEnum.EN_PROCESO,
+            EstadoPedidoEnum.TERMINADO,
+            EstadoPedidoEnum.SERVIDO,
+        ]
+        if pedido.estado in estados_bloqueados:
+            return jsonify(
+                {
+                    "error": "No puedes agregar más productos. El pedido ya está en preparación.",
+                    "estado_actual": pedido.estado.value,
+                }
+            ), 400
+
         # Verificar que el pedido pertenece al usuario
         if pedido.id_usuario != user_id:
             return jsonify(
@@ -368,9 +394,13 @@ def agregar_productos(codigo, user_id):
         # Actualizar total del pedido
         pedido.total = (pedido.total or 0) + total_encomienda
 
-        # Si el pedido estaba en INICIADO, pasar a RECEPCION
+        # Si el pedido estaba en INICIADO, pasar a RECEPCION y extender tiempo
         if pedido.estado == EstadoPedidoEnum.INICIADO:
             pedido.estado = EstadoPedidoEnum.RECEPCION
+            # Extender expiración +45 min
+            pedido.expiracion = (pedido.expiracion or datetime.now()) + timedelta(
+                minutes=TIEMPO_EXTENSION_POR_ESTADO[EstadoPedidoEnum.RECEPCION]
+            )
 
         db.commit()
 
@@ -549,6 +579,342 @@ def agregar_nota(codigo, cuenta_id, user_id):
                 "success": True,
                 "cuenta_id": cuenta_id,
                 "nota": nota,
+            }
+        ), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@cliente_bp.route("/pedido/<codigo>/rectificar", methods=["POST"])
+@requerir_auth_persona
+def rectificar_pedido(codigo, user_id):
+    """
+    Permite al cliente rectificar su pedido (volver a estado INICIADO).
+    Solo funciona si el pedido está en RECEPCION.
+    """
+    db = get_session()
+
+    try:
+        # Buscar QR y pedido
+        stmt = (
+            select(QRDinamico)
+            .options(joinedload(QRDinamico.pedido))
+            .where(QRDinamico.codigo == codigo, QRDinamico.activo.is_(True))
+        )
+        qr = db.execute(stmt).scalar_one_or_none()
+
+        if not qr:
+            return jsonify({"error": "QR invalido o expirado"}), 404
+
+        pedido = qr.pedido
+        if not pedido:
+            return jsonify({"error": "No hay pedido activo para este QR"}), 404
+
+        # Verificar que el pedido pertenece al usuario
+        if pedido.id_usuario != user_id:
+            return jsonify(
+                {"error": "No tienes permiso para modificar este pedido"}
+            ), 403
+
+        # Solo se puede rectificar si está en RECEPCION
+        if pedido.estado != EstadoPedidoEnum.RECEPCION:
+            return jsonify(
+                {
+                    "error": "Solo puedes rectificar el pedido antes de que se empiece a preparar",
+                    "estado_actual": pedido.estado.value,
+                }
+            ), 400
+
+        # Cambiar estado a INICIADO y establecer tiempo a 15 min desde ahora
+        pedido.estado = EstadoPedidoEnum.INICIADO
+        pedido.expiracion = datetime.now() + timedelta(
+            minutes=TIEMPO_EXTENSION_POR_ESTADO[EstadoPedidoEnum.INICIADO]
+        )
+        db.commit()
+
+        # Emitir evento WebSocket para que el kanban se actualice
+        emit_estado_pedido(pedido.id_local, pedido.id, "INICIADO")
+        # Emitir evento de expiración actualizada para el mapa de mesas
+        emit_expiracion_actualizada(
+            pedido.id_local,
+            pedido.id_mesa,
+            pedido.expiracion.isoformat() if pedido.expiracion else None,
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "Pedido rectificado. Puedes modificar tu orden.",
+                "estado": "INICIADO",
+            }
+        ), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@cliente_bp.route("/pedido/<codigo>/modificar", methods=["POST"])
+@requerir_auth_persona
+def modificar_pedido(codigo, user_id):
+    """
+    Modifica el pedido completo: elimina todas las encomiendas existentes
+    y crea una nueva con los productos enviados.
+    Solo funciona si el pedido está en INICIADO.
+
+    Body:
+        {
+            "productos": [
+                {"id": 1, "cantidad": 2, "nota": "sin cebolla"},
+                {"id": 2, "cantidad": 1}
+            ]
+        }
+    """
+    from models import EncomiendaCuenta
+
+    data = request.get_json()
+    if not data or "productos" not in data:
+        return jsonify({"error": "Lista de productos requerida"}), 400
+
+    productos_lista = data["productos"]
+    if not productos_lista:
+        return jsonify({"error": "Debe agregar al menos un producto"}), 400
+
+    db = get_session()
+
+    try:
+        # Buscar QR y pedido con encomiendas
+        stmt = (
+            select(QRDinamico)
+            .options(joinedload(QRDinamico.pedido).joinedload(Pedido.encomiendas))
+            .where(QRDinamico.codigo == codigo, QRDinamico.activo.is_(True))
+        )
+        qr = db.execute(stmt).unique().scalar_one_or_none()
+
+        if not qr:
+            return jsonify({"error": "QR invalido o expirado"}), 404
+
+        pedido = qr.pedido
+        if not pedido:
+            return jsonify({"error": "No hay pedido activo para este QR"}), 404
+
+        # Verificar que el pedido pertenece al usuario
+        if pedido.id_usuario != user_id:
+            return jsonify(
+                {"error": "No tienes permiso para modificar este pedido"}
+            ), 403
+
+        # Solo se puede modificar si está en INICIADO
+        if pedido.estado != EstadoPedidoEnum.INICIADO:
+            return jsonify(
+                {
+                    "error": "Solo puedes modificar el pedido cuando está en estado iniciado. Primero rectifica el pedido.",
+                    "estado_actual": pedido.estado.value,
+                }
+            ), 400
+
+        # Eliminar todas las cuentas y encomiendas existentes
+        for enc in pedido.encomiendas:
+            # Eliminar relaciones encomienda-cuenta
+            db.query(EncomiendaCuenta).filter(
+                EncomiendaCuenta.id_encomienda == enc.id
+            ).delete()
+            # Eliminar encomienda
+            db.delete(enc)
+
+        # Eliminar todas las cuentas del pedido
+        db.query(Cuenta).filter(Cuenta.id_pedido == pedido.id).delete()
+
+        db.flush()
+
+        # Crear nueva Encomienda
+        encomienda = Encomienda(
+            id_pedido=pedido.id,
+            estado=EstadoEncomiendaEnum.PENDIENTE,
+        )
+        db.add(encomienda)
+        db.flush()
+
+        # Agregar productos (Cuentas)
+        total_pedido = 0
+        cuentas_creadas = []
+
+        for item in productos_lista:
+            producto_id = item.get("id")
+            cantidad = item.get("cantidad", 1)
+            nota = item.get("nota", "")
+
+            # Obtener producto
+            producto = (
+                db.query(Producto)
+                .filter(
+                    Producto.id == producto_id,
+                    Producto.estado == EstadoProductoEnum.DISPONIBLE,
+                )
+                .first()
+            )
+
+            if not producto:
+                continue
+
+            # Crear Cuenta (linea de pedido)
+            cuenta = Cuenta(
+                id_pedido=pedido.id,
+                id_producto=producto_id,
+                creado_por=user_id,
+                cantidad=cantidad,
+                observaciones=nota if nota else None,
+            )
+            db.add(cuenta)
+            db.flush()
+
+            # Vincular con encomienda
+            enc_cuenta = EncomiendaCuenta(
+                id_cuenta=cuenta.id,
+                id_encomienda=encomienda.id,
+            )
+            db.add(enc_cuenta)
+
+            subtotal = producto.precio * cantidad
+            total_pedido += subtotal
+
+            cuentas_creadas.append(
+                {
+                    "id": cuenta.id,
+                    "producto": producto.nombre,
+                    "cantidad": cantidad,
+                    "precio_unitario": producto.precio,
+                    "subtotal": subtotal,
+                    "nota": nota,
+                }
+            )
+
+        # Actualizar total del pedido
+        pedido.total = total_pedido
+
+        # Cambiar estado a RECEPCION y sumar +45 min al tiempo existente
+        pedido.estado = EstadoPedidoEnum.RECEPCION
+        pedido.expiracion = (pedido.expiracion or datetime.now()) + timedelta(
+            minutes=TIEMPO_EXTENSION_POR_ESTADO[EstadoPedidoEnum.RECEPCION]
+        )
+
+        db.commit()
+
+        # Emitir evento WebSocket - Nueva encomienda
+        with contextlib.suppress(Exception):
+            emit_nueva_encomienda(
+                pedido.mesa.id_local if pedido.mesa else 0,
+                {
+                    "encomienda_id": encomienda.id,
+                    "pedido_id": pedido.id,
+                    "mesa_id": pedido.id_mesa,
+                    "mesa_nombre": pedido.mesa.nombre if pedido.mesa else "",
+                    "estado": encomienda.estado.value,
+                    "items": cuentas_creadas,
+                    "total": total_pedido,
+                    "es_modificacion": True,
+                },
+            )
+            # Emitir evento de expiración actualizada para el mapa de mesas
+            emit_expiracion_actualizada(
+                pedido.id_local,
+                pedido.id_mesa,
+                pedido.expiracion.isoformat() if pedido.expiracion else None,
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "encomienda": {
+                    "id": encomienda.id,
+                    "estado": encomienda.estado.value,
+                    "items": cuentas_creadas,
+                    "total": total_pedido,
+                },
+                "pedido_total": pedido.total,
+            }
+        ), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@cliente_bp.route("/pedido/<codigo>/cancelar", methods=["POST"])
+@requerir_auth_persona
+def cancelar_pedido_cliente(codigo, user_id):
+    """
+    Permite al cliente cancelar su pedido.
+    Solo funciona si el pedido está en INICIADO o RECEPCION.
+    """
+    db = get_session()
+
+    try:
+        # Buscar QR y pedido
+        stmt = (
+            select(QRDinamico)
+            .options(joinedload(QRDinamico.pedido), joinedload(QRDinamico.mesa))
+            .where(QRDinamico.codigo == codigo, QRDinamico.activo.is_(True))
+        )
+        qr = db.execute(stmt).scalar_one_or_none()
+
+        if not qr:
+            return jsonify({"error": "QR invalido o expirado"}), 404
+
+        pedido = qr.pedido
+        if not pedido:
+            return jsonify({"error": "No hay pedido activo para este QR"}), 404
+
+        # Verificar que el pedido pertenece al usuario
+        if pedido.id_usuario != user_id:
+            return jsonify(
+                {"error": "No tienes permiso para cancelar este pedido"}
+            ), 403
+
+        # Solo se puede cancelar si está en INICIADO o RECEPCION
+        estados_cancelables = [EstadoPedidoEnum.INICIADO, EstadoPedidoEnum.RECEPCION]
+        if pedido.estado not in estados_cancelables:
+            return jsonify(
+                {
+                    "error": "No puedes cancelar un pedido que ya está en preparación",
+                    "estado_actual": pedido.estado.value,
+                }
+            ), 400
+
+        # Cambiar estado a CANCELADO
+        pedido.estado = EstadoPedidoEnum.CANCELADO
+
+        # Liberar mesa
+        mesa = qr.mesa
+        if mesa:
+            mesa.estado = EstadoMesaEnum.DISPONIBLE
+
+        # Desactivar QR
+        qr.activo = False
+
+        db.commit()
+
+        # Emitir eventos WebSocket
+        emit_estado_pedido(pedido.id_local, pedido.id, "CANCELADO")
+        if mesa:
+            emit_mesa_actualizada(mesa.id_local, mesa.id, "disponible")
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "Pedido cancelado. La mesa ha sido liberada.",
+                "estado": "CANCELADO",
             }
         ), 200
 
