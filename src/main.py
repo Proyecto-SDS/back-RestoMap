@@ -1,171 +1,282 @@
 """
-Punto de entrada principal - VERSION BLINDADA PARA CLOUD RUN
-Ruta: src/main.py
+Punto de entrada principal de la aplicacion Flask
+Backend - Sistema de Gestion de Locales
 """
-import sys
-import os
-import time
-import logging
-from flask import Flask, jsonify, request
+
+from flask import Flask, jsonify
 from flask_cors import CORS
 
-# Configurar logging básico inicial
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from config import Config, get_logger, setup_logging
+from database import db_session
+from middleware import register_middleware
+from websockets import init_socketio, socketio
 
-# --- 1. IMPORTACIONES A PRUEBA DE FALLOS ---
-# En Cloud Run, si la DB falla al inicio, la app debe arrancar igual para mostrar logs.
-DB_AVAILABLE = False
-db_session = None
-engine = None
-Base = None
-
-try:
-    # Ajuste de path para que encuentre los módulos dentro de src
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    if current_dir not in sys.path:
-        sys.path.append(current_dir)
-
-    # Importaciones críticas
-    from config import Config, get_logger, setup_logging
-    from middleware import register_middleware
-    from database import db_session, engine, Base
-    import models 
-    
-    DB_AVAILABLE = True
-    setup_logging()
-    logger = get_logger(__name__)
-    logger.info("✅ Dependencias y DB cargadas correctamente.")
-except Exception as e:
-    logger.error(f"⚠️ ERROR CRÍTICO DE IMPORTACIÓN (Modo Supervivencia): {e}")
-    # Clase Config Dummy para que el código no rompa
-    class Config:
-        ENV = os.environ.get("ENV", "production")
-        DEBUG = os.environ.get("DEBUG", "False") == "True"
-        ALLOWED_ORIGINS = ["*"]
-        PORT = int(os.environ.get("PORT", 8080))
-        def validate(self): pass
-
-# --- 2. IMPORTACIÓN DEL SEED (Adaptado a tu ruta src/db/seed.py) ---
-seed_database_func = None
-seed_source = "Ninguno"
-try:
-    # Intento 1: Ruta absoluta desde src
-    from db.seed import seed_database
-    seed_database_func = seed_database
-    seed_source = "db.seed"
-except ImportError:
-    try:
-        # Intento 2: Ruta si estamos dentro de src
-        from seed import seed_database
-        seed_database_func = seed_database
-        seed_source = "seed"
-    except ImportError:
-        logger.warning("⚠️ No se encontró el archivo seed.py en db/seed.py ni en la raíz.")
+# Configurar logging centralizado
+setup_logging()
+logger = get_logger(__name__)
 
 
 def create_app(config: Config | None = None) -> Flask:
+    """
+    Factory function para crear la aplicacion Flask
+
+    Args:
+        config: Objeto de configuracion opcional (útil para testing)
+
+    Returns:
+        Instancia configurada de Flask
+    """
     app = Flask(__name__)
 
+    # Usar configuracion proporcionada o la predeterminada
     if config is None:
         config = Config()
 
+    # Validar configuracion
     try:
         config.validate()
-    except Exception:
-        pass
+    except ValueError as e:
+        logger.error(f"Error de configuracion: {e}")
+        raise
 
+    # Aplicar configuracion
     app.config.from_object(config)
 
     # Configurar CORS
-    CORS(app, resources={r"/api/*": {"origins": config.ALLOWED_ORIGINS, "supports_credentials": True}})
+    _configure_cors(app, config.ALLOWED_ORIGINS)
 
-    # Configurar DB (Solo si está disponible)
-    if DB_AVAILABLE:
-        _configure_database(app)
-        with app.app_context():
-            try:
-                Base.metadata.create_all(bind=engine)
-            except Exception as e:
-                logger.error(f"❌ Error conectando a DB en arranque: {e}")
+    # Configurar manejo de base de datos
+    _configure_database(app)
 
-    # Registrar middleware
-    if DB_AVAILABLE:
-        try:
-            register_middleware(app)
-        except Exception:
-            pass
+    # Registrar middleware (error handlers, logging, request ID)
+    register_middleware(app)
 
-    # Registrar Blueprints
+    # Registrar blueprints
     _register_blueprints(app)
 
-    # Rutas Básicas + Endpoint de Seed
+    # Rutas básicas
     _register_basic_routes(app)
+
+    logger.info("Aplicacion Flask creada correctamente")
+    logger.info(f"Entorno: {config.ENV}")
+    logger.info(f"Debug: {config.DEBUG}")
+    logger.info(f"CORS permitido desde: {', '.join(config.ALLOWED_ORIGINS)}")
+
+    # Inicializar WebSockets
+    init_socketio(app)
+    logger.info("WebSockets (Flask-SocketIO) inicializado")
 
     return app
 
 
+def _configure_cors(app: Flask, allowed_origins: list[str]) -> None:
+    """Configura CORS para la aplicacion"""
+    CORS(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": allowed_origins,
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+                "allow_headers": ["Content-Type", "Authorization"],
+                "expose_headers": ["Content-Type", "Authorization"],
+                "supports_credentials": True,
+                "max_age": 3600,  # Cache preflight por 1 hora
+            }
+        },
+    )
+    logger.info(f"CORS configurado para {len(allowed_origins)} origen(es)")
+
+
 def _configure_database(app: Flask) -> None:
+    """Configura el manejo de sesiones de base de datos"""
+
     @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        if DB_AVAILABLE and db_session:
-            db_session.remove()
+    def shutdown_session(exception: BaseException | None = None) -> None:
+        """Cierra la sesion de base de datos al final de cada request"""
+        db_session.remove()
+        if exception:
+            logger.error(f"Error en request: {exception}")
+
+    logger.info("Manejo de sesiones de BD configurado")
+
+
+def _register_error_handlers(app: Flask) -> None:
+    """Registra manejadores de errores globales"""
+
+    @app.errorhandler(404)
+    def not_found(_error):
+        """Maneja errores 404 - Recurso no encontrado"""
+        return jsonify(
+            {
+                "error": "Recurso no encontrado",
+                "message": "La ruta solicitada no existe",
+                "status": 404,
+            }
+        ), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Maneja errores 500 - Error interno del servidor"""
+        logger.error(f"Error interno del servidor: {error}")
+        db_session.rollback()  # Rollback en caso de error
+        return jsonify(
+            {
+                "error": "Error interno del servidor",
+                "message": "Ocurrio un error procesando la solicitud",
+                "status": 500,
+            }
+        ), 500
+
+    @app.errorhandler(403)
+    def forbidden(_error):
+        """Maneja errores 403 - Prohibido"""
+        return jsonify(
+            {
+                "error": "Acceso prohibido",
+                "message": "No tiene permisos para acceder a este recurso",
+                "status": 403,
+            }
+        ), 403
+
+    @app.errorhandler(401)
+    def unauthorized(_error):
+        """Maneja errores 401 - No autorizado"""
+        return jsonify(
+            {
+                "error": "No autorizado",
+                "message": "Debe autenticarse para acceder a este recurso",
+                "status": 401,
+            }
+        ), 401
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        """Maneja errores 400 - Solicitud incorrecta"""
+        return jsonify(
+            {
+                "error": "Solicitud incorrecta",
+                "message": str(error)
+                if str(error)
+                != "400 Bad Request: The browser (or proxy) sent a request that this server could not understand."
+                else "La solicitud contiene datos inválidos",
+                "status": 400,
+            }
+        ), 400
+
+    logger.info("Error handlers registrados (400, 401, 403, 404, 500)")
 
 
 def _register_blueprints(app: Flask) -> None:
-    if not DB_AVAILABLE:
-        return
+    """Registra todos los blueprints de la aplicacion"""
 
-    try:
-        from routes import locales_bp, auth_bp, opiniones_bp, reservas_bp, favoritos_bp
-        app.register_blueprint(locales_bp)
-        app.register_blueprint(auth_bp)
-        app.register_blueprint(opiniones_bp)
-        app.register_blueprint(reservas_bp)
-        app.register_blueprint(favoritos_bp)
-    except Exception as e:
-        logger.error(f"Error cargando rutas: {e}")
+    # Importar blueprints
+    from routes import locales_bp
+    from routes.auth import auth_bp
+    from routes.cliente import cliente_bp
+    from routes.empresa import empresa_bp
+    from routes.favoritos import favoritos_bp
+    from routes.invitaciones import invitaciones_bp
+    from routes.opiniones import opiniones_bp
+    from routes.reservas import reservas_bp
+
+    # Registrar blueprints
+    blueprints = [
+        (locales_bp, "locales"),
+        (auth_bp, "auth"),
+        (opiniones_bp, "opiniones"),
+        (reservas_bp, "reservas"),
+        (favoritos_bp, "favoritos"),
+        (empresa_bp, "empresa"),
+        (invitaciones_bp, "invitaciones"),
+        (cliente_bp, "cliente"),
+    ]
+
+    for blueprint, name in blueprints:
+        app.register_blueprint(blueprint)
+        logger.info(f"  Blueprint '{name}' registrado")
+
+    logger.info(f"{len(blueprints)} blueprints registrados")
 
 
 def _register_basic_routes(app: Flask) -> None:
-    
+    """Registra rutas básicas como health check"""
+
     @app.route("/")
+    def index():
+        """Ruta raiz - Redirige a health check"""
+        return health_check()
+
     @app.route("/health")
+    @app.route("/api/health")
     def health_check():
-        status = "ok" if DB_AVAILABLE else "error_db"
-        return jsonify({
-            "status": status,
-            "message": "Backend funcionando",
-            "db_connected": DB_AVAILABLE,
-            "seed_source": seed_source
-        }), 200
+        """
+        Health check endpoint para monitoreo
 
-    # --- ENDPOINT PARA GITHUB ACTIONS ---
-    @app.route("/debug/force-seed", methods=['POST'])
-    def force_seed_endpoint():
-        if not DB_AVAILABLE:
-            return jsonify({"error": "Sin conexión a DB", "message": "Revisa los logs de arranque."}), 500
-        
-        if not seed_database_func:
-            return jsonify({"error": "Falta seed.py", "message": "No se encontró src/db/seed.py"}), 500
-        
-        env = os.environ.get("ENV", "production")
-        if env == "production":
-            return jsonify({"error": "Forbidden"}), 403
+        Returns:
+            JSON con estado del servidor
+        """
+        return jsonify(
+            {
+                "status": "ok",
+                "message": "Backend Flask funcionando correctamente",
+                "environment": app.config.get("ENV", "unknown"),
+                "version": "1.0.0",  # Considera usar un archivo VERSION
+            }
+        ), 200
 
-        try:
-            logger.info(f"🌱 Ejecutando Seed desde {seed_source}...")
-            start_time = time.time()
-            seed_database_func()
-            elapsed = time.time() - start_time
-            return jsonify({"status": "success", "message": f"Seed ok en {elapsed:.2f}s"})
-        except Exception as e:
-            logger.error(f"❌ Error en seed: {e}")
-            return jsonify({"error": str(e)}), 500
+    @app.route("/api")
+    def api_info():
+        """Informacion de la API"""
+        return jsonify(
+            {
+                "name": "Sistema de Gestion de Locales - API",
+                "version": "1.0.0",
+                "endpoints": {
+                    "health": "/health",
+                    "auth": "/api/auth",
+                    "locales": "/api/locales",
+                    "opiniones": "/api/opiniones",
+                    "reservas": "/api/reservas",
+                    "favoritos": "/api/favoritos",
+                    "empresa": "/api/empresa",
+                },
+                "documentation": "Ver README.md para documentacion completa",
+            }
+        ), 200
+
+    logger.info("Rutas básicas registradas (/health, /api)")
 
 
+# Crear instancia de la aplicacion
 app = create_app()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    """
+    Punto de entrada cuando se ejecuta directamente
+
+    Nota: En produccion, usar Gunicorn en lugar de app.run()
+    Ejemplo: gunicorn -w 4 -b 0.0.0.0:5000 main:app
+    """
+
+    logger.info("=" * 60)
+    logger.info("Iniciando servidor Flask de desarrollo")
+    logger.info("=" * 60)
+    logger.info(f"Puerto: {Config.PORT}")
+    logger.info(f"Modo debug: {Config.DEBUG}")
+    logger.info(f"Entorno: {Config.ENV}")
+    logger.info("=" * 60)
+
+    if Config.ENV == "production":
+        logger.warning("Ejecutando Flask development server en produccion.")
+        logger.warning("Se recomienda usar Gunicorn o uWSGI en produccion.")
+
+    # Ejecutar servidor con SocketIO
+    # log_output=False evita logs duplicados de werkzeug (ya usamos middleware.logging)
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=Config.PORT,
+        debug=Config.DEBUG,
+        use_reloader=Config.DEBUG,
+        log_output=False,
+    )

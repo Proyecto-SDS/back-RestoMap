@@ -307,6 +307,12 @@ def setup_logging(
         "httpx",
         "googleapiclient",
         "google.auth",
+        "engineio",
+        "socketio",
+        "eventlet",
+        "eventlet.wsgi",
+        "gevent",
+        "geventwebsocket",
     ]
     for logger_name in noisy_loggers:
         logging.getLogger(logger_name).setLevel(logging.WARNING)

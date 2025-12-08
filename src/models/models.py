@@ -90,9 +90,10 @@ class EstadoPedidoEnum(str, PyEnum):
     """Estados de un pedido - ACTUALIZADO según auditoría"""
 
     INICIADO = "iniciado"  # Pedido creado desde QR
-    RECEPCION = "recepcion"  # Pedido recibido en cocina
+    RECEPCION = "recepcion"  # Pedido recibido
     EN_PROCESO = "en_proceso"  # Se está preparando
     TERMINADO = "terminado"  # Listo para servir
+    SERVIDO = "servido"  # Mesero confirma entrega
     COMPLETADO = "completado"  # Pagado y cerrado
     CANCELADO = "cancelado"
 
@@ -103,6 +104,7 @@ class EstadoPedidoEnum(str, PyEnum):
             (cls.RECEPCION, "Recepción"),
             (cls.EN_PROCESO, "En Proceso"),
             (cls.TERMINADO, "Terminado"),
+            (cls.SERVIDO, "Servido"),
             (cls.COMPLETADO, "Completado"),
             (cls.CANCELADO, "Cancelado"),
         ]
@@ -121,11 +123,22 @@ class EstadoPedidoEnum(str, PyEnum):
             cls.INICIADO: [cls.RECEPCION, cls.CANCELADO],
             cls.RECEPCION: [cls.EN_PROCESO, cls.CANCELADO],
             cls.EN_PROCESO: [cls.TERMINADO, cls.CANCELADO],
-            cls.TERMINADO: [cls.COMPLETADO],
+            cls.TERMINADO: [cls.SERVIDO, cls.CANCELADO],
+            cls.SERVIDO: [cls.COMPLETADO],
             cls.COMPLETADO: [],
             cls.CANCELADO: [],
         }
         return estado_nuevo in transiciones.get(estado_actual, [])
+
+
+# Tiempos de extensión por estado (en minutos)
+# Estos tiempos se ACUMULAN al cambiar de estado
+TIEMPO_EXTENSION_POR_ESTADO = {
+    EstadoPedidoEnum.INICIADO: 15,  # Al escanear QR
+    EstadoPedidoEnum.RECEPCION: 45,  # Al agregar productos
+    EstadoPedidoEnum.EN_PROCESO: 15,  # Al comenzar preparación
+    # TERMINADO y SERVIDO no extienden, solo generan alertas
+}
 
 
 # ============================================
@@ -387,12 +400,34 @@ class TipoFoto(Base):
     fotos = relationship("Foto", back_populates="tipo_foto", lazy="select")
 
 
+class TipoCategoria(Base):
+    """Tipo de categoria: Comida o Bebida - para filtrar en cocina/barra"""
+
+    __tablename__ = "tipo_categoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(50), nullable=False, unique=True)
+
+    categorias = relationship(
+        "Categoria", back_populates="tipo_categoria", lazy="select"
+    )
+
+
 class Categoria(Base):
     __tablename__ = "categoria"
 
     id = Column(Integer, primary_key=True, index=True)
+    id_tipo_categoria = Column(
+        Integer,
+        ForeignKey("tipo_categoria.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     nombre = Column(String(100), nullable=False, unique=True)
 
+    tipo_categoria = relationship(
+        "TipoCategoria", back_populates="categorias", lazy="joined"
+    )
     productos = relationship("Producto", back_populates="categoria", lazy="selectin")
     fotos = relationship("Foto", back_populates="categoria", lazy="selectin")
 
@@ -512,6 +547,7 @@ class Mesa(Base):
     nombre = Column(String(30), nullable=False)
     descripcion = Column(String(100), nullable=True)
     capacidad = Column(SmallInteger, nullable=False)
+    orden = Column(SmallInteger, nullable=False, default=0, server_default="0")
     estado = Column(
         Enum(EstadoMesaEnum, name="estado_mesa_enum"),
         nullable=False,
@@ -860,6 +896,7 @@ class Reserva(Base):
     )
     fecha_reserva = Column(Date, nullable=False)
     hora_reserva = Column(Time, nullable=False)
+    num_personas = Column(SmallInteger, nullable=False, default=1)
     estado = Column(
         Enum(EstadoReservaEnum, name="estado_reserva_enum"),
         nullable=False,
@@ -946,8 +983,9 @@ class QRDinamico(Base):
         index=True,
     )
     codigo = Column(String(255), nullable=False, unique=True, index=True)
-    expiracion = Column(DateTime(timezone=True), nullable=False)
+    expiracion = Column(DateTime(timezone=True), nullable=True)
     activo = Column(Boolean, default=True, nullable=False, index=True)
+    num_personas = Column(SmallInteger, nullable=True, default=None)
     creado_el = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1004,11 +1042,13 @@ class Pedido(Base):
         default=EstadoPedidoEnum.INICIADO,
         index=True,
     )
+    num_personas = Column(SmallInteger, nullable=False, default=None)
     total = Column(Integer, nullable=False, default=0)
     creado_el = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     actualizado_el = Column(DateTime(timezone=True), onupdate=func.now())
+    expiracion = Column(DateTime(timezone=True), nullable=True, index=True)
 
     local = relationship("Local", back_populates="pedidos", lazy="joined")
     mesa = relationship("Mesa", back_populates="pedidos", lazy="joined")
@@ -1272,6 +1312,7 @@ class PedidoSchema(BaseModel):
     id_qr: int
     creado_por: int
     estado: EstadoPedidoEnum
+    num_personas: int | None = None
     total: int
 
     class Config:
@@ -1311,6 +1352,7 @@ class QRDinamicoSchema(BaseModel):
     codigo: str
     expiracion: datetime
     activo: bool
+    num_personas: int | None = None
     creado_el: datetime | None = None
 
     class Config:
