@@ -1,18 +1,14 @@
-name: Despliegue BACK PRODUCCIÓN (Manual/Auto)
+name: Despliegue BACK PRODUCCIÓN (Auto-Create)
 
 on:
-  # Opción 1: Automático cuando se hace push a main
   push:
     branches: [ "main" ]
-  
-  # Opción 2: Manual eligiendo la rama
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Rama a desplegar (ej: main, develop, fix/algo)'
+        description: 'Rama a desplegar'
         required: true
         default: 'main'
-        type: string
 
 env:
   PROJECT_ID: 'restomap-478918'
@@ -20,6 +16,7 @@ env:
   REPO_NAME: 'repo'
   SQL_INSTANCE_CONNECTION_NAME: 'restomap-478918:us-central1:restomap'
   SERVICE_NAME: 'backend-prod'
+  
   # Secretos
   DB_USER_SECRET: ${{ secrets.DB_USER }} 
   DB_PASS_SECRET: ${{ secrets.DB_PASSWORD }}
@@ -36,21 +33,20 @@ jobs:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v4
         with:
-          # MAGIA AQUÍ: Si es manual usa el input, si es automático usa la referencia del push
           ref: ${{ inputs.branch || github.ref }}
 
-      # =========================================================
-      # PASO DE DEBUG: Verificamos qué código acabamos de bajar
-      # =========================================================
-      - name: 🕵️ DEBUG - Verificar código descargado
+      # --- PASO DE SEGURIDAD PARA QUE VEAS QUE EL CÓDIGO ES EL NUEVO ---
+      - name: 🕵️ DEBUG - Verificar código
         run: |
-          echo "RAMA DESPLEGADA: ${{ inputs.branch || github.ref_name }}"
-          echo "----------------------------------------"
-          echo "Verificando src/main.py (Líneas clave):"
-          ls -la src/main.py
-          # Muestra las líneas donde solía estar el error
+          echo "Verificando src/main.py..."
+          # Buscamos si existe la línea problemática
+          if grep -F "app.register_blueprint(locales_bp)" src/main.py; then
+             echo "❌ PELIGRO: El código TIENE el error viejo."
+          else
+             echo "✅ CORRECTO: El código NO tiene el error viejo."
+          fi
+          # Muestra las líneas críticas
           cat src/main.py | sed -n '110,140p'
-          echo "----------------------------------------"
 
       - name: 🔑 Autenticación con GCP
         uses: google-github-actions/auth@v2
@@ -66,28 +62,52 @@ jobs:
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev
           
-          # Usamos el SHA corto para el tag si es push, o 'manual' si es dispatch
-          TAG_VERSION="${{ github.sha }}"
+          # Usamos el SHA único del commit para evitar problemas de caché
+          IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           
-          IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${TAG_VERSION}"
-          LATEST_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest"
+          echo "Construyendo imagen: $IMAGE_TAG"
 
-          echo "Construyendo desde rama: ${{ inputs.branch || github.ref_name }}"
-
-          # Construimos usando el Dockerfile de producción y SIN caché
-          docker build --no-cache -f Dockerfile -t $IMAGE_TAG -t $LATEST_TAG .
-          
+          # --no-cache es vital aquí
+          docker build --no-cache -f Dockerfile -t $IMAGE_TAG .
           docker push $IMAGE_TAG
-          docker push $LATEST_TAG
           
           echo "image_uri=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: 🚀 Deploy Cloud Run
+      - name: 🚀 Deploy Cloud Run (Creación Automática)
         id: deploy
         run: |
-          # Crear archivo de variables seguro
+          echo "Generando archivo de entorno..."
           cat <<EOF > env_vars_prod.yaml
           ENV: production
           DB_HOST: /cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }}
           DB_USER: ${{ env.DB_USER_SECRET }}
-          DB_NAME:
+          DB_NAME: ${{ env.DB_NAME_SECRET }}
+          DB_PASSWORD: ${{ env.DB_PASS_SECRET }}
+          SEED_KEY: ${{ secrets.SEED_KEY }}
+          EOF
+          
+          echo "Desplegando servicio (Se creará si no existe)..."
+          
+          # NOTA: Usamos la etiqueta SHA específica, NO 'latest'
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ steps.build-push.outputs.image_uri }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --min-instances 1 \
+            --max-instances 10 \
+            --cpu 1 \
+            --memory 512Mi \
+            --service-account 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com' \
+            --add-cloudsql-instances "${{ env.SQL_INSTANCE_CONNECTION_NAME }}" \
+            --env-vars-file env_vars_prod.yaml \
+            --quiet
+            
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format 'value(status.url)')
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+      - name: ✅ Resumen
+        if: success()
+        run: |
+          echo "### 🚀 Servicio Creado/Actualizado"
+          echo "🔗 [${{ steps.deploy.outputs.service_url }}](${{ steps.deploy.outputs.service_url }})"
