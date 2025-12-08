@@ -2,20 +2,18 @@ name: Despliegue BACK PRODUCCIÓN
 
 on:
   push:
-    branches: [ "main" ] # Se activa solo al hacer push/merge a main
-  workflow_dispatch:      # Permite ejecución manual desde la pestaña Actions
+    branches: [ "main" ] 
+  workflow_dispatch:
 
 env:
   PROJECT_ID: 'restomap-478918'
   GCP_REGION: 'us-central1'
   REPO_NAME: 'repo'
-  # INSTANCIA REAL DE PRODUCCIÓN (Debe existir previamente en GCP)
   SQL_INSTANCE_CONNECTION_NAME: 'restomap-478918:us-central1:restomap'
   SERVICE_NAME: 'backend-prod'
-  # Secretos de Producción (Configúralos en GitHub -> Settings -> Secrets)
   DB_USER_SECRET: ${{ secrets.DB_USER }} 
   DB_PASS_SECRET: ${{ secrets.DB_PASSWORD }}
-  DB_NAME_SECRET: ${{ secrets.DB_NAME }} # Ej: restomap_prod
+  DB_NAME_SECRET: ${{ secrets.DB_NAME }}
 
 jobs:
   deploy-production:
@@ -27,6 +25,22 @@ jobs:
     steps:
       - name: ⬇️ Checkout code
         uses: actions/checkout@v4
+
+      # ==================================================================
+      # NUEVO PASO DE DEBUG: Muestra el código ANTES de entrar a Docker
+      # ==================================================================
+      - name: 🕵️ DEBUG: VERIFICAR CÓDIGO (Líneas 110-140)
+        run: |
+          echo "========================================================"
+          echo "ESTO ES LO QUE GITHUB DESCARGÓ DEL REPO:"
+          echo "========================================================"
+          ls -R src/
+          echo "--------------------------------------------------------"
+          echo "CONTENIDO DE src/main.py (Líneas clave):"
+          echo "--------------------------------------------------------"
+          # Muestra de la línea 110 a la 140 donde ocurre el error
+          cat src/main.py | sed -n '110,140p' 
+          echo "========================================================"
 
       - name: 🔑 Autenticación con GCP
         uses: google-github-actions/auth@v2
@@ -42,13 +56,12 @@ jobs:
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev
           
-          # Etiquetas: SHA para trazabilidad y 'latest' para facilidad
           IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
           LATEST_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.SERVICE_NAME }}:latest"
 
+          # Usamos --no-cache para asegurar que no use capas viejas
           docker build --no-cache -f Dockerfile -t $IMAGE_TAG -t $LATEST_TAG .
           
-          # Subimos ambas etiquetas
           docker push $IMAGE_TAG
           docker push $LATEST_TAG
           
@@ -57,9 +70,6 @@ jobs:
       - name: 🚀 Deploy Cloud Run (Producción)
         id: deploy
         run: |
-          # 1. Crear archivo de variables seguro
-          # ENV: production -> Activa los candados de seguridad en main.py
-          # SEED_KEY -> Define la contraseña maestra para permitir seed manual si es necesario
           cat <<EOF > env_vars_prod.yaml
           ENV: production
           DB_HOST: /cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }}
@@ -69,7 +79,6 @@ jobs:
           SEED_KEY: ${{ secrets.SEED_KEY }}
           EOF
           
-          # 2. Desplegar
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ steps.build-push.outputs.image_uri }} \
             --region ${{ env.GCP_REGION }} \
@@ -92,7 +101,3 @@ jobs:
           echo "### 🚀 Producción Desplegada Exitosamente"
           echo "La nueva versión está activa en:"
           echo "🔗 [${{ steps.deploy.outputs.service_url }}](${{ steps.deploy.outputs.service_url }})"
-          echo ""
-          echo "ℹ️ **Base de Datos:** ${{ env.SQL_INSTANCE_CONNECTION_NAME }}"
-          echo "⚠️ **Seed:** No ejecutado automáticamente. Para ejecutar manual:"
-          echo "   curl -X POST '${{ steps.deploy.outputs.service_url }}/debug/force-seed?key=TU_CLAVE_SECRETA'"
