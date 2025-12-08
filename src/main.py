@@ -15,6 +15,10 @@ from websockets import init_socketio, socketio
 setup_logging()
 logger = get_logger(__name__)
 
+import sys
+print("!!! INICIANDO NUEVA VERSION - V3 !!!", file=sys.stderr)
+logger.info("!!! INICIANDO NUEVA VERSION - V3 !!!")
+# -----------------------------
 
 def create_app(config: Config | None = None) -> Flask:
     """
