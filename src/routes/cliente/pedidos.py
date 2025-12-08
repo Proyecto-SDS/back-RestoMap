@@ -992,3 +992,96 @@ def obtener_pedido_activo(user_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
+
+
+@cliente_bp.route("/historial", methods=["GET"])
+@requerir_auth_persona
+def obtener_historial(user_id):
+    """
+    Obtiene el historial de pedidos completados del cliente.
+    Retorna todos los pedidos con estado COMPLETADO asociados a QRs del usuario.
+    """
+    db = get_session()
+
+    try:
+        # Buscar todos los pedidos completados del usuario
+        stmt = (
+            select(Pedido)
+            .options(
+                joinedload(Pedido.qr),
+                joinedload(Pedido.mesa),
+                joinedload(Pedido.local),
+                joinedload(Pedido.cuentas).joinedload(Cuenta.producto),
+                joinedload(Pedido.pagos),
+            )
+            .where(
+                Pedido.id_usuario == user_id,
+                Pedido.estado == EstadoPedidoEnum.COMPLETADO,
+            )
+            .order_by(Pedido.actualizado_el.desc())
+        )
+        pedidos = db.execute(stmt).scalars().unique().all()
+
+        historial = []
+        for pedido in pedidos:
+            # Calcular productos del pedido
+            productos = []
+            for cuenta in pedido.cuentas:
+                productos.append(
+                    {
+                        "id": cuenta.producto.id,
+                        "nombre": cuenta.producto.nombre,
+                        "cantidad": cuenta.cantidad,
+                        "precio": cuenta.producto.precio,
+                        "observaciones": cuenta.observaciones,
+                    }
+                )
+
+            # Obtener información del pago
+            pago_info = None
+            if pedido.pagos:
+                pago = pedido.pagos[0]  # Tomar el primer pago
+                pago_info = {
+                    "metodo": pago.metodo.value if pago.metodo else None,
+                    "monto": pago.monto,
+                    "estado": pago.estado.value if pago.estado else None,
+                    "fecha": pago.creado_el.isoformat() if pago.creado_el else None,
+                }
+
+            historial.append(
+                {
+                    "pedido_id": pedido.id,
+                    "qr_codigo": pedido.qr.codigo if pedido.qr else None,
+                    "fecha": pedido.creado_el.isoformat() if pedido.creado_el else None,
+                    "fecha_completado": (
+                        pedido.actualizado_el.isoformat()
+                        if pedido.actualizado_el
+                        else None
+                    ),
+                    "total": pedido.total,
+                    "num_personas": pedido.num_personas,
+                    "mesa": {
+                        "id": pedido.mesa.id if pedido.mesa else None,
+                        "nombre": pedido.mesa.nombre if pedido.mesa else None,
+                    },
+                    "local": {
+                        "id": pedido.local.id if pedido.local else None,
+                        "nombre": pedido.local.nombre if pedido.local else None,
+                        "direccion": (
+                            f"{pedido.local.direccion.calle} {pedido.local.direccion.numero}"
+                            if pedido.local and pedido.local.direccion
+                            else None
+                        ),
+                    },
+                    "productos": productos,
+                    "pago": pago_info,
+                }
+            )
+
+        return jsonify({"historial": historial}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
