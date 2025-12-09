@@ -553,6 +553,7 @@ class Mesa(Base):
         nullable=False,
         default=EstadoMesaEnum.DISPONIBLE,
     )
+    eliminado_el = Column(DateTime(timezone=True), nullable=True)
 
     local = relationship("Local", back_populates="mesas", lazy="joined")
     reservas_mesa = relationship(
@@ -749,7 +750,10 @@ class Foto(Base):
         nullable=True,
         index=True,
     )
-    ruta = Column(Text, nullable=False)
+    ruta = Column(
+        Text, nullable=True
+    )  # Para URLs externas o compatibilidad con datos antiguos
+    data = Column(Text, nullable=True)  # Imagen en base64 - nuevo campo
 
     local = relationship("Local", back_populates="fotos", lazy="joined")
     producto = relationship("Producto", back_populates="fotos", lazy="joined")
@@ -807,6 +811,7 @@ class Producto(Base):
         nullable=False,
         default=EstadoProductoEnum.DISPONIBLE,
     )
+    eliminado_el = Column(DateTime(timezone=True), nullable=True)
     precio = Column(Integer, nullable=False)
 
     local = relationship("Local", back_populates="productos", lazy="joined")
@@ -1299,6 +1304,7 @@ class ProductoSchema(BaseModel):
     estado: EstadoProductoEnum
     id_local: int
     id_categoria: int | None = None
+    eliminado_el: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -1338,6 +1344,7 @@ class MesaSchema(BaseModel):
     descripcion: str | None = None
     capacidad: int
     estado: EstadoMesaEnum
+    eliminado_el: datetime | None = None
 
     class Config:
         from_attributes = True

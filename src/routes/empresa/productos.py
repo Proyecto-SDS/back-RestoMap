@@ -7,7 +7,7 @@ import contextlib
 
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from database import get_session
@@ -61,7 +61,7 @@ def listar_productos(user_id, user_rol, id_local):
         stmt = (
             select(Producto)
             .options(joinedload(Producto.categoria))
-            .where(Producto.id_local == id_local)
+            .where(Producto.id_local == id_local, Producto.eliminado_el.is_(None))
             .order_by(Producto.nombre)
         )
 
@@ -90,6 +90,9 @@ def listar_productos(user_id, user_rol, id_local):
                     else "disponible",
                     "categoria_id": producto.id_categoria,
                     "categoria_nombre": producto.categoria.nombre
+                    if producto.categoria
+                    else None,
+                    "tipo_categoria_id": producto.categoria.id_tipo_categoria
                     if producto.categoria
                     else None,
                 }
@@ -256,7 +259,10 @@ def eliminar_producto(producto_id, user_id, user_rol, id_local):
         if not producto:
             return jsonify({"error": "Producto no encontrado"}), 404
 
-        db.delete(producto)
+        # Soft Delete
+        producto.eliminado_el = func.now()
+        producto.estado = EstadoProductoEnum.INACTIVO
+
         db.commit()
 
         return jsonify({"message": "Producto eliminado exitosamente"}), 200
