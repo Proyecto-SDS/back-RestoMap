@@ -21,6 +21,29 @@ from models import (
 locales_bp = Blueprint("locales", __name__, url_prefix="/api/locales")
 
 
+def add_base64_prefix(data):
+    """
+    Agrega el prefijo data:image/...;base64, necesario para que el navegador
+    interprete la imagen correctamente si solo tenemos el string base64.
+    """
+    if not data:
+        return None
+
+    if data.startswith("data:"):
+        return data
+
+    if data.startswith("/9j/"):
+        mime = "jpeg"
+    elif data.startswith("iVBORw"):
+        mime = "png"
+    elif data.startswith("UklGR"):
+        mime = "webp"
+    else:
+        mime = "jpeg"
+
+    return f"data:image/{mime};base64,{data}"
+
+
 @locales_bp.route("/", methods=["GET"])
 def obtener_locales():
     """Obtiene todos los locales de la base de datos con informacion completa."""
@@ -100,9 +123,18 @@ def obtener_locales():
                     None,
                 )
                 if foto_principal:
-                    image = foto_principal.ruta
+                    image = (
+                        add_base64_prefix(foto_principal.data)
+                        if foto_principal.data
+                        else foto_principal.ruta
+                    )
                 elif local.fotos:
-                    image = local.fotos[0].ruta
+                    primera_foto = local.fotos[0]
+                    image = (
+                        add_base64_prefix(primera_foto.data)
+                        if primera_foto.data
+                        else primera_foto.ruta
+                    )
 
             # Construir objeto de respuesta
             local_data = {
@@ -262,20 +294,21 @@ def obtener_local(id):
 
         if local.fotos:
             for foto in local.fotos:
+                foto_ruta = add_base64_prefix(foto.data) if foto.data else foto.ruta
                 # pyrefly: ignore [missing-attribute]
-                fotos_dict["todas"].append(foto.ruta)
+                fotos_dict["todas"].append(foto_ruta)
                 if foto.tipo_foto:
                     tipo_nombre = foto.tipo_foto.nombre.lower()
 
                     if tipo_nombre == "banner":
                         # pyrefly: ignore [missing-attribute]
-                        fotos_dict["banner"].append(foto.ruta)
+                        fotos_dict["banner"].append(foto_ruta)
                     elif tipo_nombre == "capturas":
                         # pyrefly: ignore [missing-attribute]
-                        fotos_dict["capturas"].append(foto.ruta)
+                        fotos_dict["capturas"].append(foto_ruta)
                         # pyrefly: ignore [missing-attribute]
                         fotos_dict["galeria"].append(
-                            foto.ruta
+                            foto_ruta
                         )  # Mapear capturas a galeria
 
         # Intentar asignar logo si hay capturas (fallback)
@@ -368,7 +401,8 @@ def obtener_productos_local(id):
             # Obtener imagen del producto
             imagen = None
             if producto.fotos:
-                imagen = producto.fotos[0].ruta
+                p_foto = producto.fotos[0]
+                imagen = add_base64_prefix(p_foto.data) if p_foto.data else p_foto.ruta
 
             categorias_dict[categoria_nombre]["productos"].append(
                 {

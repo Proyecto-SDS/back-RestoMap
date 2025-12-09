@@ -44,6 +44,30 @@ def normalize_base64(base64_string):
         return None
 
 
+def add_base64_prefix(data):
+    """
+    Agrega el prefijo data:image/...;base64, necesario para que el navegador
+    interprete la imagen correctamente si solo tenemos el string base64.
+    """
+    if not data:
+        return None
+
+    if data.startswith("data:"):
+        return data
+
+    # Detección simple basada en firmas mágicas
+    if data.startswith("/9j/"):
+        mime = "jpeg"
+    elif data.startswith("iVBORw"):
+        mime = "png"
+    elif data.startswith("UklGR"):
+        mime = "webp"
+    else:
+        mime = "jpeg"  # Fallback
+
+    return f"data:image/{mime};base64,{data}"
+
+
 @fotos_bp.route("/", methods=["GET"])
 def obtener_fotos():
     """Obtiene todas las fotos del local del empleado autenticado."""
@@ -76,12 +100,12 @@ def obtener_fotos():
 
         for foto in fotos:
             # Retornar la imagen como data URI para que se muestre directamente
-            # Si tiene data (base64), usarla; si tiene ruta (legacy), mantenerla
-            foto_ruta = foto.data if foto.data else foto.ruta
+            # Si tiene data (base64), reconstruir prefijo; si tiene ruta (legacy), mantenerla
+            foto_ruta = add_base64_prefix(foto.data) if foto.data else foto.ruta
 
             foto_data = {
                 "id": foto.id,
-                "ruta": foto_ruta,  # Ahora es base64 o URL
+                "ruta": foto_ruta,
                 "tipo": foto.tipo_foto.nombre if foto.tipo_foto else None,
             }
 
