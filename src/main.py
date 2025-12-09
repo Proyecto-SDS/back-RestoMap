@@ -8,9 +8,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config, get_logger, setup_logging
-from database import db_session
+from database import db_session, engine, Base
 from middleware import register_middleware
 from websockets import init_socketio, socketio
+
 
 # Configurar logging centralizado
 setup_logging()
@@ -272,6 +273,28 @@ def _register_basic_routes(app: Flask) -> None:
                 return jsonify({"error": "forbidden"}), 403
 
         return jsonify(sorted(list(app.blueprints.keys()))), 200
+    
+    @app.route("/debug/force-seed", methods=["POST"])
+    def force_seed():
+        # 1. Verificar seguridad
+        key = request.args.get("key")
+        if not key or key != app.config.get("SEED_KEY"):
+            return jsonify({"error": "Forbidden"}), 403
+
+        try:
+            # 2. Crear Tablas (Esto solo crea las que no existen)
+            Base.metadata.create_all(bind=engine)
+            
+            # 3. Insertar datos semilla (Opcional)
+            # if not db_session.query(Usuario).first():
+            #     admin = Usuario(email="admin@admin.com", ...)
+            #     db_session.add(admin)
+            #     db_session.commit()
+            
+            return jsonify({"message": "Base de datos actualizada correctamente"}), 200
+        except Exception as e:
+            logger.error(f"Seed error: {e}")
+            return jsonify({"error": str(e)}), 500
 
 
 # Crear instancia de la aplicacion
