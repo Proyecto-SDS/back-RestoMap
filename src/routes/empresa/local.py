@@ -11,6 +11,44 @@ from database import get_session
 from models import Direccion, Local, Redes, TipoRed
 from utils.jwt_helper import verificar_token
 
+# URLs base para cada tipo de red social
+SOCIAL_URLS = {
+    "Instagram": "https://instagram.com/",
+    "Facebook": "https://facebook.com/",
+    "TikTok": "https://tiktok.com/@",
+    "YouTube": "https://youtube.com/@",
+    "X/Twitter": "https://x.com/",
+    "WhatsApp": "https://wa.me/",
+    "LinkedIn": "https://linkedin.com/in/",
+    "Sitio Web": "",  # URL completa proporcionada por el usuario
+}
+
+
+def generar_url_red(tipo_nombre: str, nombre_usuario: str) -> str:
+    """Genera la URL completa para una red social dado el tipo y nombre de usuario."""
+    if not nombre_usuario:
+        return ""
+
+    # Limpiar el nombre de usuario (quitar @ si viene)
+    nombre_limpio = nombre_usuario.lstrip("@").strip()
+
+    # Para WhatsApp, limpiar todo excepto números y el +
+    if tipo_nombre == "WhatsApp":
+        nombre_limpio = "".join(c for c in nombre_usuario if c.isdigit() or c == "+")
+
+    # Para Sitio Web, devolver tal cual si ya tiene protocolo
+    if tipo_nombre == "Sitio Web":
+        if nombre_usuario.startswith(("http://", "https://")):
+            return nombre_usuario
+        return f"https://{nombre_usuario}"
+
+    base_url = SOCIAL_URLS.get(tipo_nombre, "")
+    if not base_url:
+        return nombre_usuario  # Fallback
+
+    return f"{base_url}{nombre_limpio}"
+
+
 local_bp = Blueprint("local", __name__, url_prefix="/local")
 
 
@@ -42,7 +80,7 @@ def actualizar_redes():
         return jsonify({"error": "Usuario no asociado a un local"}), 403
 
     data = request.get_json()
-    # data debe ser lista de { id_tipo_red: int, url: string }
+    # data debe ser lista de { id_tipo_red: int, nombre_usuario: string }
 
     db = get_session()
     try:
@@ -54,38 +92,32 @@ def actualizar_redes():
             return jsonify({"error": "Local no encontrado"}), 404
 
         # Eliminar redes actuales
-        # Se eliminan todas para recrearlas con la nueva lista
-        # Esto maneja implícitamente la eliminación si no vienen en la lista
         db.query(Redes).filter(Redes.id_local == id_local).delete()
 
         # Insertar nuevas redes
         if data and isinstance(data, list):
             for item in data:
-                url = item.get("url", "").strip()
+                nombre_usuario = item.get("nombre_usuario", "").strip()
                 id_tipo = item.get("id_tipo_red")
 
-                if url and id_tipo:
+                if nombre_usuario and id_tipo:
+                    # Obtener el tipo de red para generar la URL
+                    tipo_red = db.execute(
+                        select(TipoRed).where(TipoRed.id == id_tipo)
+                    ).scalar_one_or_none()
+
+                    tipo_nombre = tipo_red.nombre if tipo_red else ""
+                    url_generada = generar_url_red(tipo_nombre, nombre_usuario)
+
+                    # Limpiar @ del nombre para guardarlo limpio
+                    nombre_limpio = nombre_usuario.lstrip("@").strip()
+
                     nueva_red = Redes(
                         id_local=id_local,
                         id_tipo_red=id_tipo,
-                        url=url,
-                        nombre_usuario=url,  # Por defecto usamos la URL si no se pide nombre de usuario explicito, o podriamos parsearlo. El requerimiento dice "pongan sus redes".
-                        # El modelo requiere nombre_usuario. Vamos a extraerlo o usar algo genérico.
-                        # Mejor: usar el último segmento de la URL como nombre de usuario tentativo?
-                        # O simplemente guardar la URL como nombre de usuario por ahora?
-                        # Revisando requerimiento: "tengan los campos vacios y pongan sus redes".
-                        # Asumiremos que el input es la URL completa.
+                        nombre_usuario=nombre_limpio,
+                        url=url_generada,
                     )
-                    # For simplicity, let's try to extract user from URL or just use "User"
-                    # But the User didn't specify a "username" field, just "redes".
-                    # Let's verify standard behavior. usually people paste https://instagram.com/foo
-
-                    # Simple parsing logic
-                    if "facebook.com" in url or "instagram.com" in url:
-                        nueva_red.nombre_usuario = url.split("/")[-1]
-                    else:
-                        nueva_red.nombre_usuario = url  # Fallback
-
                     db.add(nueva_red)
 
         db.commit()
@@ -155,7 +187,7 @@ def obtener_local_info():
             redes.append(
                 {
                     "id_tipo_red": r.id_tipo_red,
-                    "url": r.url,
+                    "nombre_usuario": r.nombre_usuario,
                 }
             )
 
