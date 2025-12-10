@@ -584,8 +584,8 @@ def register_empresa(data: RegisterEmpresaSchema):
             id_comuna=data.id_comuna,
             calle=data.calle,
             numero=data.numero,
-            longitud=-70.64827,  # Coordenadas por defecto (Santiago centro)
-            latitud=-33.45694,
+            longitud=data.longitud,
+            latitud=data.latitud,
         )
         db.add(nueva_direccion)
         db.flush()  # Obtener ID sin commit

@@ -148,6 +148,8 @@ class RegisterEmpresaSchema(BaseModel):
     calle: str = Field(..., min_length=3)
     numero: int = Field(..., gt=0)
     id_comuna: int = Field(..., ge=1)
+    latitud: float = Field(..., ge=-90, le=90)
+    longitud: float = Field(..., ge=-180, le=180)
 
     # Datos del Usuario Gerente
     nombre_gerente: str = Field(..., min_length=2)
