@@ -1,10 +1,10 @@
-# ✅ Checklist de Verificación - Docker, Alembic & Poetry
+# Checklist de Verificación - Docker, Alembic & Poetry
 
 Usa este checklist para verificar que todo está configurado correctamente.
 
 ---
 
-## 📋 ANTES DE COMMITEAR
+## ANTES DE COMMITEAR
 
 - [ ] `pyproject.toml` tiene sección `[tool.alembic]` completa
 - [ ] `alembic.ini` solo contiene config de runtime (DB URL + logging)
@@ -27,8 +27,9 @@ docker build -t restomap-test -f Dockerfile .
 ```
 
 **Esperado:**
-- ✅ Build exitoso sin errores
-- ✅ Tamaño de imagen ~400-500 MB (verificar con `docker images`)
+
+- Build exitoso sin errores
+- Tamaño de imagen ~400-500 MB (verificar con `docker images`)
 
 ### 2. Variables de Entorno
 
@@ -39,6 +40,7 @@ cat .env
 ```
 
 **Verificar que existen:**
+
 - [ ] `DB_USER`
 - [ ] `DB_PASSWORD`
 - [ ] `DB_HOST=db`
@@ -56,8 +58,9 @@ docker-compose ps
 ```
 
 **Esperado:**
-- ✅ PostgreSQL corriendo
-- ✅ Estado: `healthy` (después de ~5 segundos)
+
+- PostgreSQL corriendo
+- Estado: `healthy` (después de ~5 segundos)
 
 ### 4. Inicialización de Base de Datos
 
@@ -66,9 +69,10 @@ docker-compose --profile init up init-db
 ```
 
 **Esperado:**
-- ✅ Migraciones aplicadas exitosamente
-- ✅ Seeds ejecutados sin errores
-- ✅ Mensaje: "Base de datos inicializada correctamente!"
+
+- Migraciones aplicadas exitosamente
+- Seeds ejecutados sin errores
+- Mensaje: "Base de datos inicializada correctamente!"
 
 ### 5. Backend
 
@@ -80,9 +84,10 @@ docker-compose logs -f backend
 ```
 
 **Esperado:**
-- ✅ Backend inicia sin errores
-- ✅ Logs muestran: "Running on http://0.0.0.0:5000"
-- ✅ Health check pasa (después de 40s)
+
+- Backend inicia sin errores
+- Logs muestran: "Running on http://0.0.0.0:5000"
+- Health check pasa (después de 40s)
 
 ### 6. Pruebas de Endpoints
 
@@ -95,12 +100,13 @@ curl http://localhost:5000/
 ```
 
 **Esperado:**
-- ✅ Respuesta 200 OK
-- ✅ JSON válido
+
+- Respuesta 200 OK
+- JSON válido
 
 ---
 
-## 🔧 VERIFICACIÓN DE ALEMBIC
+## VERIFICACIÓN DE ALEMBIC
 
 ### 1. Configuración en pyproject.toml
 
@@ -109,6 +115,7 @@ cat pyproject.toml | grep -A 10 "\[tool.alembic\]"
 ```
 
 **Verificar que existe:**
+
 - [ ] `script_location = "alembic"`
 - [ ] `prepend_sys_path = [".", "src"]`
 - [ ] `file_template` con formato de fecha
@@ -121,8 +128,9 @@ docker-compose --profile tools run app alembic current
 ```
 
 **Esperado:**
-- ✅ Muestra revisión actual
-- ✅ Marca como `(head)` si está actualizado
+
+- Muestra revisión actual
+- Marca como `(head)` si está actualizado
 
 ### 3. Historial
 
@@ -131,8 +139,9 @@ docker-compose --profile tools run app alembic history
 ```
 
 **Esperado:**
-- ✅ Lista todas las migraciones
-- ✅ Nombres de archivo con formato: `YYYY_MM_DD_HHMM-{rev}_{slug}.py`
+
+- Lista todas las migraciones
+- Nombres de archivo con formato: `YYYY_MM_DD_HHMM-{rev}_{slug}.py`
 
 ### 4. Crear Nueva Migración (Prueba)
 
@@ -141,18 +150,20 @@ docker-compose --profile tools run app alembic revision -m "test"
 ```
 
 **Verificar:**
+
 - [ ] Archivo creado en `alembic/versions/`
 - [ ] Nombre incluye fecha/hora
 - [ ] Archivo formateado con ruff (sin errores de lint)
 
-**⚠️ ELIMINAR** el archivo de prueba después:
+**ELIMINAR** el archivo de prueba después:
+
 ```bash
 rm alembic/versions/YYYY_MM_DD_*.py
 ```
 
 ---
 
-## 🎯 VERIFICACIÓN DE DOCKERFILE
+## VERIFICACIÓN DE DOCKERFILE
 
 ### 1. Multi-Stage Build
 
@@ -161,6 +172,7 @@ docker history restomap-test | head -20
 ```
 
 **Verificar:**
+
 - [ ] Aparecen dos stages: builder y runtime
 - [ ] Runtime no incluye gcc ni build tools
 
@@ -171,7 +183,8 @@ docker run --rm restomap-test whoami
 ```
 
 **Esperado:**
-- ✅ Output: `appuser` (NO `root`)
+
+- Output: `appuser` (NO `root`)
 
 ### 3. Health Check
 
@@ -180,6 +193,7 @@ docker inspect restomap-test | grep -A 10 Healthcheck
 ```
 
 **Verificar:**
+
 - [ ] Intervalo: 30s
 - [ ] Timeout: 3s
 - [ ] Start period: 40s
@@ -191,13 +205,14 @@ docker run --rm restomap-test env | grep -E "PYTHON|PORT|ENV"
 ```
 
 **Esperado:**
-- ✅ `PYTHONPATH=/app/src`
-- ✅ `PYTHONUNBUFFERED=1`
-- ✅ `PORT=5000`
+
+- `PYTHONPATH=/app/src`
+- `PYTHONUNBUFFERED=1`
+- `PORT=5000`
 
 ---
 
-## ☁️ PREPARACIÓN PARA GCP
+## ☁PREPARACIÓN PARA GCP
 
 ### 1. Variables GCP Template
 
@@ -206,6 +221,7 @@ cat .env.gcp.template
 ```
 
 **Verificar que tiene:**
+
 - [ ] `DB_HOST=/cloudsql/...` (formato Unix socket)
 - [ ] Instrucciones de Secret Manager
 - [ ] Comandos gcloud completos
@@ -217,6 +233,7 @@ python scripts/migrate_gcp.py --help 2>&1 || echo "OK - script existe"
 ```
 
 **Verificar:**
+
 - [ ] Archivo existe
 - [ ] Es ejecutable (`chmod +x` en Linux/Mac)
 - [ ] Importa correctamente (no errors de sintaxis)
@@ -228,12 +245,13 @@ ls -la | grep -E "DEPLOYMENT|CONFIGURACION"
 ```
 
 **Verificar que existen:**
+
 - [ ] `DEPLOYMENT.md`
 - [ ] `CONFIGURACION.md`
 
 ---
 
-## 🧪 TESTS DE INTEGRACIÓN
+## TESTS DE INTEGRACIÓN
 
 ### 1. Flujo Completo Local
 
@@ -251,8 +269,9 @@ docker-compose up -d db && \
 ```
 
 **Esperado:**
-- ✅ Todo ejecuta sin errores
-- ✅ Health check retorna 200
+
+- Todo ejecuta sin errores
+- Health check retorna 200
 
 ### 2. Persistencia de Datos
 
@@ -265,8 +284,9 @@ curl http://localhost:5000/api/locales
 ```
 
 **Esperado:**
-- ✅ Backend reinicia correctamente
-- ✅ Datos siguen disponibles
+
+- Backend reinicia correctamente
+- Datos siguen disponibles
 
 ### 3. Logs Sin Errores
 
@@ -275,12 +295,13 @@ docker-compose logs backend | grep -i error
 ```
 
 **Esperado:**
-- ✅ Sin errores críticos
-- ✅ Solo warnings esperados (si los hay)
+
+- Sin errores críticos
+- Solo warnings esperados (si los hay)
 
 ---
 
-## 📊 MÉTRICAS DE ÉXITO
+## MÉTRICAS DE ÉXITO
 
 ### Tamaño de Imagen
 
@@ -350,7 +371,7 @@ docker-compose exec backend python --version
 
 ---
 
-## ✅ CHECKLIST FINAL PRE-DEPLOY
+## CHECKLIST FINAL PRE-DEPLOY
 
 Antes de hacer deploy a GCP:
 
@@ -370,11 +391,11 @@ Antes de hacer deploy a GCP:
 
 ## 🎉 TODO LISTO
 
-Si todos los checks están ✅, estás listo para:
+Si todos los checks están , estás listo para:
 
 1. Commitear cambios
 2. Deploy a GCP Cloud Run
-3. Profit! 🚀
+3. Profit!
 
 ---
 

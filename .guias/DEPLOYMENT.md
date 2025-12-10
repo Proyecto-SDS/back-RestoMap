@@ -1,10 +1,10 @@
-# 🚀 Guía de Deployment - Backend RestoMap
+# Guía de Deployment - Backend RestoMap
 
 Esta guía detalla cómo ejecutar el backend con Docker localmente y desplegarlo en Google Cloud Platform (GCP).
 
 ---
 
-## 📋 Tabla de Contenidos
+## Tabla de Contenidos
 
 - [Prerequisitos](#prerequisitos)
 - [Configuración Local con Docker](#configuración-local-con-docker)
@@ -279,23 +279,23 @@ curl -X POST http://localhost:8080/admin/migrate
 
 ### Variables Requeridas
 
-| Variable | Descripción | Ejemplo Local | Ejemplo GCP |
-|----------|-------------|---------------|-------------|
-| `ENV` | Entorno de ejecución | `dev` | `production` |
-| `DB_USER` | Usuario PostgreSQL | `restomap_user` | `restomap_user` |
-| `DB_PASSWORD` | Contraseña PostgreSQL | `password123` | (Secret Manager) |
-| `DB_HOST` | Host de base de datos | `db` | `/cloudsql/proyecto:region:instance` |
-| `DB_PORT` | Puerto PostgreSQL | `5432` | - (no aplica para Unix socket) |
-| `DB_NAME` | Nombre de base de datos | `restomap_db` | `restomap_db` |
-| `JWT_SECRET_KEY` | Clave secreta para JWT | (dev key) | (Secret Manager) |
+| Variable         | Descripción             | Ejemplo Local   | Ejemplo GCP                          |
+| ---------------- | ----------------------- | --------------- | ------------------------------------ |
+| `ENV`            | Entorno de ejecución    | `dev`           | `production`                         |
+| `DB_USER`        | Usuario PostgreSQL      | `restomap_user` | `restomap_user`                      |
+| `DB_PASSWORD`    | Contraseña PostgreSQL   | `password123`   | (Secret Manager)                     |
+| `DB_HOST`        | Host de base de datos   | `db`            | `/cloudsql/proyecto:region:instance` |
+| `DB_PORT`        | Puerto PostgreSQL       | `5432`          | - (no aplica para Unix socket)       |
+| `DB_NAME`        | Nombre de base de datos | `restomap_db`   | `restomap_db`                        |
+| `JWT_SECRET_KEY` | Clave secreta para JWT  | (dev key)       | (Secret Manager)                     |
 
 ### Variables Opcionales
 
-| Variable | Descripción | Default |
-|----------|-------------|---------|
-| `PORT` | Puerto del servidor | `5000` |
+| Variable          | Descripción              | Default                 |
+| ----------------- | ------------------------ | ----------------------- |
+| `PORT`            | Puerto del servidor      | `5000`                  |
 | `ALLOWED_ORIGINS` | Orígenes CORS permitidos | `http://localhost:3000` |
-| `PYTHONPATH` | Path de módulos Python | `/app/src` |
+| `PYTHONPATH`      | Path de módulos Python   | `/app/src`              |
 
 ---
 
@@ -371,7 +371,7 @@ docker-compose build --no-cache backend
 
 ---
 
-## 📚 Recursos Adicionales
+## Recursos Adicionales
 
 - [Documentación Docker](https://docs.docker.com/)
 - [Documentación Poetry](https://python-poetry.org/docs/)
@@ -381,12 +381,12 @@ docker-compose build --no-cache backend
 
 ---
 
-## 🤝 Contribuir
+## Contribuir
 
 Para contribuir al proyecto, consulta [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 [MIT License](../LICENSE)
