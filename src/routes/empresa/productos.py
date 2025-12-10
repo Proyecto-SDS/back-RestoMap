@@ -60,7 +60,7 @@ def listar_productos(user_id, user_rol, id_local):
     try:
         stmt = (
             select(Producto)
-            .options(joinedload(Producto.categoria))
+            .options(joinedload(Producto.categoria), joinedload(Producto.fotos))
             .where(Producto.id_local == id_local, Producto.eliminado_el.is_(None))
             .order_by(Producto.nombre)
         )
@@ -79,6 +79,23 @@ def listar_productos(user_id, user_rol, id_local):
 
         result = []
         for producto in productos:
+            # Obtener imagen del producto si existe
+            imagen_url = None
+            if producto.fotos:
+                foto = producto.fotos[0]
+                if foto.data:
+                    # Agregar prefijo base64
+                    if foto.data.startswith("/9j/"):
+                        imagen_url = f"data:image/jpeg;base64,{foto.data}"
+                    elif foto.data.startswith("iVBORw"):
+                        imagen_url = f"data:image/png;base64,{foto.data}"
+                    elif foto.data.startswith("UklGR"):
+                        imagen_url = f"data:image/webp;base64,{foto.data}"
+                    else:
+                        imagen_url = f"data:image/jpeg;base64,{foto.data}"
+                elif foto.ruta:
+                    imagen_url = foto.ruta
+
             result.append(
                 {
                     "id": producto.id,
@@ -95,6 +112,7 @@ def listar_productos(user_id, user_rol, id_local):
                     "tipo_categoria_id": producto.categoria.id_tipo_categoria
                     if producto.categoria
                     else None,
+                    "imagen": imagen_url,
                 }
             )
 

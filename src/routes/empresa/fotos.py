@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from database import get_session
-from models import Foto, TipoFoto
+from models import Foto, Producto, TipoFoto
 from utils.jwt_helper import verificar_token
 
 fotos_bp = Blueprint("fotos", __name__, url_prefix="/fotos")
@@ -318,6 +318,173 @@ def eliminar_captura(foto_id):
     except Exception as e:
         db.rollback()
         print(f"Error eliminando captura: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ============================================
+# FOTOS DE PRODUCTOS
+# ============================================
+
+
+@fotos_bp.route("/producto/<int:producto_id>", methods=["GET"])
+def obtener_foto_producto(producto_id):
+    """Obtiene la foto de un producto."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Token no proporcionado"}), 401
+
+    token = auth_header.split(" ")[1]
+    payload = verificar_token(token)
+    if not payload:
+        return jsonify({"error": "Token invalido"}), 401
+
+    id_local = payload.get("id_local")
+    if not id_local:
+        return jsonify({"error": "Usuario no asociado a un local"}), 403
+
+    db = get_session()
+    try:
+        # Verificar que el producto pertenece al local
+        producto = db.execute(
+            select(Producto).where(
+                Producto.id == producto_id, Producto.id_local == id_local
+            )
+        ).scalar_one_or_none()
+
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+
+        # Buscar foto del producto
+        foto = db.execute(
+            select(Foto).where(Foto.id_producto == producto_id)
+        ).scalar_one_or_none()
+
+        if not foto:
+            return jsonify({"foto": None}), 200
+
+        foto_ruta = add_base64_prefix(foto.data) if foto.data else foto.ruta
+
+        return jsonify({"foto": {"id": foto.id, "ruta": foto_ruta}}), 200
+
+    finally:
+        db.close()
+
+
+@fotos_bp.route("/producto/<int:producto_id>", methods=["POST"])
+def actualizar_foto_producto(producto_id):
+    """Actualiza o crea la foto de un producto (solo puede haber 1 por producto)."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Token no proporcionado"}), 401
+
+    token = auth_header.split(" ")[1]
+    payload = verificar_token(token)
+    if not payload:
+        return jsonify({"error": "Token invalido"}), 401
+
+    id_local = payload.get("id_local")
+    if not id_local:
+        return jsonify({"error": "Usuario no asociado a un local"}), 403
+
+    data = request.get_json()
+    if not data or "imagen" not in data:
+        return jsonify({"error": "No se proporciono imagen"}), 400
+
+    db = get_session()
+    try:
+        # Verificar que el producto pertenece al local
+        producto = db.execute(
+            select(Producto).where(
+                Producto.id == producto_id, Producto.id_local == id_local
+            )
+        ).scalar_one_or_none()
+
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+
+        # Normalizar la imagen base64
+        base64_data = normalize_base64(data["imagen"])
+
+        if not base64_data:
+            return jsonify({"error": "Formato de imagen invalido"}), 400
+
+        # Buscar si ya existe una foto para este producto
+        foto_existente = db.execute(
+            select(Foto).where(Foto.id_producto == producto_id)
+        ).scalar_one_or_none()
+
+        if foto_existente:
+            # Actualizar foto existente
+            foto_existente.data = base64_data
+            foto_existente.ruta = None
+        else:
+            # Crear nueva foto
+            nueva_foto = Foto(
+                id_producto=producto_id,
+                id_local=id_local,
+                data=base64_data,
+                ruta=None,
+            )
+            db.add(nueva_foto)
+
+        db.commit()
+
+        return jsonify({"message": "Foto de producto actualizada correctamente"}), 200
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error actualizando foto de producto: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@fotos_bp.route("/producto/<int:producto_id>", methods=["DELETE"])
+def eliminar_foto_producto(producto_id):
+    """Elimina la foto de un producto."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Token no proporcionado"}), 401
+
+    token = auth_header.split(" ")[1]
+    payload = verificar_token(token)
+    if not payload:
+        return jsonify({"error": "Token invalido"}), 401
+
+    id_local = payload.get("id_local")
+    if not id_local:
+        return jsonify({"error": "Usuario no asociado a un local"}), 403
+
+    db = get_session()
+    try:
+        # Verificar que el producto pertenece al local
+        producto = db.execute(
+            select(Producto).where(
+                Producto.id == producto_id, Producto.id_local == id_local
+            )
+        ).scalar_one_or_none()
+
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+
+        # Buscar la foto
+        foto = db.execute(
+            select(Foto).where(Foto.id_producto == producto_id)
+        ).scalar_one_or_none()
+
+        if not foto:
+            return jsonify({"error": "Foto no encontrada"}), 404
+
+        db.delete(foto)
+        db.commit()
+
+        return jsonify({"message": "Foto de producto eliminada correctamente"}), 200
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error eliminando foto de producto: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
