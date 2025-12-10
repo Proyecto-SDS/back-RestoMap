@@ -28,6 +28,10 @@ def create_app(config: Config | None = None) -> Flask:
     """
     app = Flask(__name__)
 
+    # Deshabilitar strict_slashes globalmente para aceptar URLs con/sin trailing slash
+    # Esto es necesario porque CORS preflight (OPTIONS) no sigue redirecciones
+    app.url_map.strict_slashes = False
+
     # Usar configuracion proporcionada o la predeterminada
     if config is None:
         config = Config()
