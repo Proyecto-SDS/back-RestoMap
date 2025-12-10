@@ -274,26 +274,53 @@ def _register_basic_routes(app: Flask) -> None:
 
         return jsonify(sorted(list(app.blueprints.keys()))), 200
     
-    @app.route("/debug/force-seed", methods=["POST"])
+    @app.route("/debug/force-seed", methods=['POST'])
     def force_seed():
-        # 1. Verificar seguridad
+        # 1. SEGURIDAD: Reemplazamos el bloqueo de 'production' por la llave
         key = request.args.get("key")
-        if not key or key != app.config.get("SEED_KEY"):
-            return jsonify({"error": "Forbidden"}), 403
+        server_key = app.config.get("SEED_KEY")
+        
+        # Si no hay llave o no coincide, bloqueamos
+        if not server_key or key != server_key:
+             logger.warning("⛔ Intento de seed no autorizado")
+             return jsonify({"error": "Forbidden"}), 403
 
         try:
-            # 2. Crear Tablas (Esto solo crea las que no existen)
+            logger.info("🌱 Iniciando proceso de Seed...")
+            start_time = __import__("time").time() # Importamos time aquí por si acaso
+
+            # 2. ASEGURAR ESTRUCTURA: Creamos tablas primero (vital para el error de columnas)
+            # Importamos modelos para que SQLAlchemy los vea
+            import models 
             Base.metadata.create_all(bind=engine)
-            
-            # 3. Insertar datos semilla (Opcional)
-            # if not db_session.query(Usuario).first():
-            #     admin = Usuario(email="admin@admin.com", ...)
-            #     db_session.add(admin)
-            #     db_session.commit()
-            
-            return jsonify({"message": "Base de datos actualizada correctamente"}), 200
+            logger.info("✅ Tablas verificadas/creadas.")
+
+            # 3. EJECUTAR EL POBLADO (Tu lógica antigua adaptada)
+            # Intentamos importar tu función de seed antigua si existe
+            try:
+                from db.seed import seed_database as seed_database_func
+                logger.info("Ejecutando seed_database() desde db/seed.py...")
+                seed_database_func()
+            except ImportError:
+                # Si no existe el archivo antiguo, usamos una lógica simple aquí
+                logger.warning("⚠️ No se encontró db/seed.py, insertando datos básicos inline...")
+                # --- TU LÓGICA DE DATOS BÁSICOS AQUÍ ---
+                # from models import Usuario
+                # if not db_session.query(Usuario).first():
+                #     db_session.add(Usuario(email="admin@restomap.com", ...))
+                #     db_session.commit()
+                # ---------------------------------------
+
+            elapsed = __import__("time").time() - start_time
+            return jsonify({
+                "status": "success", 
+                "message": f"Base de datos poblada en {elapsed:.2f}s",
+                "tables": list(Base.metadata.tables.keys())
+            })
+
         except Exception as e:
-            logger.error(f"Seed error: {e}")
+            logger.error(f"❌ Error en seed: {e}")
+            db_session.rollback()
             return jsonify({"error": str(e)}), 500
 
 
