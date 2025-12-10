@@ -79,6 +79,7 @@ jobs:
           echo "Generando archivo de entorno..."
           cat <<EOF > env_vars_prod.yaml
           ENV: production
+          TZ: America/Santiago
           DB_HOST: /cloudsql/${{ env.SQL_INSTANCE_CONNECTION_NAME }}
           DB_USER: ${{ env.DB_USER_SECRET }}
           DB_NAME: ${{ env.DB_NAME_SECRET }}
