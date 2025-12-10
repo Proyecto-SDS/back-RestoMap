@@ -48,7 +48,7 @@ services:
     command: python src/main.py
     tty: true # Habilita colores ANSI en logs
     ports:
-      - "5000:5000"
+      - "8000:5000"
     env_file:
       - .env
     environment:
@@ -63,7 +63,7 @@ services:
       PYTHONPATH: /app/src
       TZ: America/Santiago
       # CORS
-      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000"
       # JWT (usar valor seguro en .env)
       JWT_SECRET_KEY: "${JWT_SECRET_KEY:-dev-secret-key-change-in-production-2025}"
     depends_on:
@@ -119,7 +119,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=${NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}
       # Hot-reload en Windows/Docker
       - WATCHPACK_POLLING=true

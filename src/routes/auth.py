@@ -18,7 +18,7 @@ from models.models import Direccion, Local, Rol, Usuario
 from schemas import LoginSchema, ProfileUpdateSchema, RegisterSchema
 from schemas.auth import RegisterEmpresaSchema
 from services.rut_service import (
-    consultar_rut_sii,
+    consultar_rut_sre,
     validar_digito_verificador,
     validar_formato_rut,
 )
@@ -479,8 +479,23 @@ def validar_rut(rut: str):
         if not validar_digito_verificador(rut):
             return jsonify({"error": "Digito verificador incorrecto"}), 400
 
-        # Consultar API sre.cl
-        resultado = consultar_rut_sii(rut)
+        # Normalizar RUT (quitar solo puntos, mantener guión)
+        # En BD se almacena como: 12345678-9
+        rut_limpio = rut.replace(".", "")
+
+        # PRIMERO: Verificar si ya existe en nuestra BD
+        db = next(get_db())
+        local_existente = db.execute(
+            select(Local).where(Local.rut_empresa == rut_limpio)
+        ).scalar_one_or_none()
+
+        if local_existente:
+            return jsonify(
+                {"error": "Este RUT ya esta registrado en la plataforma"}
+            ), 400
+
+        # SEGUNDO: Consultar API SRE.cl (mas rapida que SimpleAPI)
+        resultado = consultar_rut_sre(rut)
 
         if not resultado["valido"]:
             return jsonify({"error": resultado["error"]}), 400
@@ -562,35 +577,58 @@ def register_empresa(data: RegisterEmpresaSchema):
         if correo_local_existente:
             return jsonify({"error": "El correo del local ya esta registrado"}), 400
 
-        # 3. Verificar correo del gerente
-        correo_gerente_existente = db.execute(
-            select(Usuario).where(Usuario.correo == data.correo_gerente.lower())
-        ).scalar_one_or_none()
+        # 3. Manejar gerente: vincular existente o validar nuevo
+        usuario_gerente = None
 
-        if correo_gerente_existente:
-            return jsonify({"error": "El correo del gerente ya esta registrado"}), 400
+        if data.id_persona:
+            # Caso A: Vincular usuario existente
+            usuario_gerente = db.execute(
+                select(Usuario).where(Usuario.id == data.id_persona)
+            ).scalar_one_or_none()
 
-        # 4. Validar RUT con API (debe existir en SII)
-        resultado_rut = consultar_rut_sii(data.rut_empresa)
-        if not resultado_rut["existe"]:
-            return jsonify(
-                {
-                    "error": "RUT no encontrado en el SII. Solo empresas registradas pueden usar la plataforma."
-                }
-            ), 400
+            if not usuario_gerente:
+                return jsonify({"error": "Usuario no encontrado"}), 404
 
-        # 5. Crear Direccion
+            # Verificar que el usuario no sea empleado de otro local
+            if usuario_gerente.id_local is not None:
+                return jsonify(
+                    {"error": "Este usuario ya es gerente/empleado de otro local"}
+                ), 400
+
+            # Verificar que el correo coincida
+            if usuario_gerente.correo != data.correo_gerente.lower():
+                return jsonify(
+                    {"error": "El correo del gerente no coincide con el usuario"}
+                ), 400
+
+        else:
+            # Caso B: Crear nuevo usuario - validar que el correo no exista
+            if not data.contrasena:
+                return jsonify(
+                    {"error": "Se requiere contraseña para crear nuevo usuario"}
+                ), 400
+
+            correo_gerente_existente = db.execute(
+                select(Usuario).where(Usuario.correo == data.correo_gerente.lower())
+            ).scalar_one_or_none()
+
+            if correo_gerente_existente:
+                return jsonify(
+                    {"error": "El correo del gerente ya esta registrado"}
+                ), 400
+
+        # 4. Crear Direccion (RUT ya fue validado en paso 1 del formulario)
         nueva_direccion = Direccion(
             id_comuna=data.id_comuna,
             calle=data.calle,
             numero=data.numero,
-            longitud=-70.64827,  # Coordenadas por defecto (Santiago centro)
-            latitud=-33.45694,
+            longitud=data.longitud,
+            latitud=data.latitud,
         )
         db.add(nueva_direccion)
         db.flush()  # Obtener ID sin commit
 
-        # 6. Crear Local
+        # 5. Crear Local
         nuevo_local = Local(
             id_direccion=nueva_direccion.id,
             id_tipo_local=data.id_tipo_local,
@@ -600,7 +638,7 @@ def register_empresa(data: RegisterEmpresaSchema):
             correo=data.correo_local.lower(),
             rut_empresa=data.rut_empresa,
             razon_social=data.razon_social,
-            glosa_giro=resultado_rut.get("glosa_giro"),
+            glosa_giro=data.glosa_giro,  # Ya viene validado del paso 1
             terminos_aceptados=True,
             fecha_aceptacion_terminos=datetime.now(),
             version_terminos="v1.0",
@@ -608,32 +646,42 @@ def register_empresa(data: RegisterEmpresaSchema):
         db.add(nuevo_local)
         db.flush()  # Obtener ID sin commit
 
-        # 7. Obtener rol "gerente"
+        # 6. Obtener rol "gerente"
         rol_gerente = db.execute(
             select(Rol).where(Rol.nombre == "gerente")
         ).scalar_one_or_none()
 
         rol_id = 2 if not rol_gerente else rol_gerente.id
 
-        # 8. Hash de contrasena
-        hashed_password = bcrypt.hashpw(
-            data.contrasena.encode("utf-8"), bcrypt.gensalt()
-        )
+        # 8. Crear o vincular usuario gerente
+        if data.id_persona and usuario_gerente:
+            # Vincular usuario existente como gerente
+            usuario_gerente.id_rol = rol_id
+            usuario_gerente.id_local = nuevo_local.id
+            logger.info(
+                f"Usuario existente {usuario_gerente.id} vinculado como gerente del local {nuevo_local.id}"
+            )
+        else:
+            # Crear nuevo usuario gerente con contraseña
+            assert data.contrasena is not None, "Se requiere contraseña"
+            hashed_password = bcrypt.hashpw(
+                data.contrasena.encode("utf-8"), bcrypt.gensalt()
+            )
 
-        # 9. Crear Usuario Gerente
-        nuevo_usuario = Usuario(
-            id_rol=rol_id,
-            id_local=nuevo_local.id,
-            nombre=data.nombre_gerente,
-            correo=data.correo_gerente.lower(),
-            contrasena=hashed_password.decode("utf-8"),
-            telefono=int(data.telefono_gerente),
-            terminos_aceptados=True,
-            fecha_aceptacion_terminos=datetime.now(),
-        )
-        db.add(nuevo_usuario)
+            nuevo_usuario = Usuario(
+                id_rol=rol_id,
+                id_local=nuevo_local.id,
+                nombre=data.nombre_gerente,
+                correo=data.correo_gerente.lower(),
+                contrasena=hashed_password.decode("utf-8"),
+                telefono=int(data.telefono_gerente),
+                terminos_aceptados=True,
+                fecha_aceptacion_terminos=datetime.now(),
+            )
+            db.add(nuevo_usuario)
+            logger.info(f"Nuevo usuario gerente creado para local {nuevo_local.id}")
 
-        # 10. Commit atomico
+        # 9. Commit atomico
         db.commit()
 
         logger.info(

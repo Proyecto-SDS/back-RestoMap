@@ -219,11 +219,13 @@ def cambiar_estado_pedido(pedido_id, user_id, user_rol, id_local):
             pedido.qr.activo = False
 
         # Liberar mesa si el pedido se completó o canceló
-        if data.estado in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]:
-            if pedido.mesa:
-                from models.models import EstadoMesaEnum
+        if (
+            data.estado in [EstadoPedidoEnum.COMPLETADO, EstadoPedidoEnum.CANCELADO]
+            and pedido.mesa
+        ):
+            from models.models import EstadoMesaEnum
 
-                pedido.mesa.estado = EstadoMesaEnum.DISPONIBLE
+            pedido.mesa.estado = EstadoMesaEnum.DISPONIBLE
 
         db.commit()
 

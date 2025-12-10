@@ -5,7 +5,7 @@ Prefix: /api/empresa/mesas/*
 
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from database import get_session
@@ -75,7 +75,9 @@ def listar_mesas(user_id, user_rol, id_local):
 
     db = get_session()
     try:
-        stmt = select(Mesa).where(Mesa.id_local == id_local)
+        stmt = select(Mesa).where(
+            Mesa.id_local == id_local, Mesa.eliminado_el.is_(None)
+        )
         mesas = db.execute(stmt).scalars().all()
 
         result = []
@@ -324,7 +326,7 @@ def cambiar_estado_mesa(mesa_id, user_id, user_rol, id_local):
 @mesas_bp.route("/<int:mesa_id>", methods=["DELETE"])
 @requerir_auth
 @requerir_empleado
-@requerir_roles_empresa("gerente")
+@requerir_roles_empresa("gerente", "mesero")
 def eliminar_mesa(mesa_id, user_id, user_rol, id_local):
     """Eliminar una mesa"""
     db = get_session()
@@ -343,7 +345,11 @@ def eliminar_mesa(mesa_id, user_id, user_rol, id_local):
                 {"error": "No se puede eliminar una mesa con pedidos activos"}
             ), 400
 
-        db.delete(mesa)
+        # Soft Delete
+        mesa.eliminado_el = func.now()
+        # Cambiar estado a fuera de servicio para evitar asignar pedidos si algo falla
+        mesa.estado = EstadoMesaEnum.FUERA_DE_SERVICIO
+
         db.commit()
 
         return jsonify({"message": "Mesa eliminada exitosamente"}), 200

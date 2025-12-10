@@ -9,6 +9,7 @@ import re
 import requests
 
 from config import get_logger
+from services.acteco_mapping import obtener_descripciones_actecos
 
 logger = get_logger(__name__)
 
@@ -216,6 +217,132 @@ def consultar_rut_sii(rut: str) -> dict:
         }
     except Exception as e:
         logger.error(f"Error inesperado en consulta RUT: {e}")
+        return {
+            "valido": False,
+            "existe": False,
+            "razon_social": None,
+            "glosa_giro": None,
+            "error": "Error inesperado al validar el RUT",
+        }
+
+
+def consultar_rut_sre(rut: str) -> dict:
+    """
+    Consulta la API SRE.cl para obtener informacion de un contribuyente.
+    Esta API es mas rapida y usa un token publico.
+
+    Args:
+        rut: RUT del contribuyente (con o sin puntos)
+
+    Returns:
+        dict con:
+            - valido: bool - Si la consulta fue exitosa
+            - existe: bool - Si el RUT existe en el SII
+            - razon_social: str | None
+            - glosa_giro: str | None
+            - error: str | None - Mensaje de error si aplica
+    """
+    rut_limpio = limpiar_rut(rut)
+
+    # Validar formato y digito verificador primero
+    if not validar_formato_rut(rut):
+        return {
+            "valido": False,
+            "existe": False,
+            "razon_social": None,
+            "glosa_giro": None,
+            "error": "Formato de RUT invalido",
+        }
+
+    if not validar_digito_verificador(rut):
+        return {
+            "valido": False,
+            "existe": False,
+            "razon_social": None,
+            "glosa_giro": None,
+            "error": "Digito verificador incorrecto",
+        }
+
+    try:
+        # Consultar API SRE.cl con token publico
+        url = "https://sre.cl/api/company_info"
+        params = {
+            "token": "token_publico",
+            "rut": rut_limpio,
+            "actualizado": "False",
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+
+        # Manejar errores HTTP
+        if response.status_code == 404:
+            return {
+                "valido": True,
+                "existe": False,
+                "razon_social": None,
+                "glosa_giro": None,
+                "error": "RUT no encontrado en el SII",
+            }
+
+        if response.status_code != 200:
+            logger.error(
+                f"Error HTTP {response.status_code} en SRE.cl: {response.text}"
+            )
+            return {
+                "valido": False,
+                "existe": False,
+                "razon_social": None,
+                "glosa_giro": None,
+                "error": "Error al consultar el servicio de validacion",
+            }
+
+        data = response.json()
+
+        # Verificar que tenga los campos necesarios
+        if not data or "razon_social" not in data:
+            return {
+                "valido": True,
+                "existe": False,
+                "razon_social": None,
+                "glosa_giro": None,
+                "error": "RUT no encontrado en el SII",
+            }
+
+        # Extraer actecos y convertir a descripciones usando mapeo local
+        giro = None
+        actecos = data.get("actecos", [])
+        if actecos and len(actecos) > 0:
+            # Usar mapeo local de códigos ACTECO
+            giro = obtener_descripciones_actecos(actecos)
+
+        return {
+            "valido": True,
+            "existe": True,
+            "razon_social": data.get("razon_social"),
+            "glosa_giro": giro,
+            "error": None,
+        }
+
+    except requests.exceptions.Timeout:
+        logger.error("Timeout al consultar API SRE.cl")
+        return {
+            "valido": False,
+            "existe": False,
+            "razon_social": None,
+            "glosa_giro": None,
+            "error": "Tiempo de espera agotado al consultar el SII",
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error al consultar API SRE.cl: {e}")
+        return {
+            "valido": False,
+            "existe": False,
+            "razon_social": None,
+            "glosa_giro": None,
+            "error": "Error al conectar con el servicio de validacion",
+        }
+    except Exception as e:
+        logger.error(f"Error inesperado en consulta RUT SRE: {e}")
         return {
             "valido": False,
             "existe": False,

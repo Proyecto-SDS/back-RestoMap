@@ -22,6 +22,29 @@ from models import (
 locales_bp = Blueprint("bp_locales", __name__, url_prefix="/api/locales")
 
 
+def add_base64_prefix(data):
+    """
+    Agrega el prefijo data:image/...;base64, necesario para que el navegador
+    interprete la imagen correctamente si solo tenemos el string base64.
+    """
+    if not data:
+        return None
+
+    if data.startswith("data:"):
+        return data
+
+    if data.startswith("/9j/"):
+        mime = "jpeg"
+    elif data.startswith("iVBORw"):
+        mime = "png"
+    elif data.startswith("UklGR"):
+        mime = "webp"
+    else:
+        mime = "jpeg"
+
+    return f"data:image/{mime};base64,{data}"
+
+
 @locales_bp.route("/", methods=["GET"])
 def obtener_locales():
     """Obtiene todos los locales de la base de datos con informacion completa."""
@@ -101,9 +124,18 @@ def obtener_locales():
                     None,
                 )
                 if foto_principal:
-                    image = foto_principal.ruta
+                    image = (
+                        add_base64_prefix(foto_principal.data)
+                        if foto_principal.data
+                        else foto_principal.ruta
+                    )
                 elif local.fotos:
-                    image = local.fotos[0].ruta
+                    primera_foto = local.fotos[0]
+                    image = (
+                        add_base64_prefix(primera_foto.data)
+                        if primera_foto.data
+                        else primera_foto.ruta
+                    )
 
             # Construir objeto de respuesta
             local_data = {
@@ -263,20 +295,21 @@ def obtener_local(id):
 
         if local.fotos:
             for foto in local.fotos:
+                foto_ruta = add_base64_prefix(foto.data) if foto.data else foto.ruta
                 # pyrefly: ignore [missing-attribute]
-                fotos_dict["todas"].append(foto.ruta)
+                fotos_dict["todas"].append(foto_ruta)
                 if foto.tipo_foto:
                     tipo_nombre = foto.tipo_foto.nombre.lower()
 
                     if tipo_nombre == "banner":
                         # pyrefly: ignore [missing-attribute]
-                        fotos_dict["banner"].append(foto.ruta)
+                        fotos_dict["banner"].append(foto_ruta)
                     elif tipo_nombre == "capturas":
                         # pyrefly: ignore [missing-attribute]
-                        fotos_dict["capturas"].append(foto.ruta)
+                        fotos_dict["capturas"].append(foto_ruta)
                         # pyrefly: ignore [missing-attribute]
                         fotos_dict["galeria"].append(
-                            foto.ruta
+                            foto_ruta
                         )  # Mapear capturas a galeria
 
         # Intentar asignar logo si hay capturas (fallback)
@@ -369,7 +402,8 @@ def obtener_productos_local(id):
             # Obtener imagen del producto
             imagen = None
             if producto.fotos:
-                imagen = producto.fotos[0].ruta
+                p_foto = producto.fotos[0]
+                imagen = add_base64_prefix(p_foto.data) if p_foto.data else p_foto.ruta
 
             categorias_dict[categoria_nombre]["productos"].append(
                 {
@@ -838,5 +872,140 @@ def verificar_reserva_activa(id):
             return jsonify({"tieneReservaActiva": False}), 200
 
     except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# ENDPOINTS PUT - Actualización de Local
+# ============================================
+
+
+@locales_bp.route("/<int:local_id>/info", methods=["PUT"])
+def actualizar_info_local(local_id):
+    """Actualiza la información básica del local (nombre, teléfono, correo)."""
+    try:
+        local = db_session.query(Local).get(local_id)
+        if not local:
+            return jsonify({"error": "Local no encontrado"}), 404
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No se proporcionaron datos"}), 400
+
+        # Campos editables
+        if "nombre" in data:
+            local.nombre = data["nombre"]
+        if "telefono" in data:
+            local.telefono = data["telefono"]
+        if "descripcion" in data:
+            local.descripcion = data["descripcion"]
+        if "correo" in data:
+            # Verificar que el correo no esté en uso por otro local
+            existing = (
+                db_session.query(Local)
+                .filter(Local.correo == data["correo"], Local.id != local_id)
+                .first()
+            )
+            if existing:
+                return jsonify({"error": "El correo ya está en uso"}), 400
+            local.correo = data["correo"]
+
+        db_session.commit()
+        return jsonify(
+            {
+                "message": "Información actualizada correctamente",
+                "local": {
+                    "id": local.id,
+                    "nombre": local.nombre,
+                    "telefono": local.telefono,
+                    "correo": local.correo,
+                },
+            }
+        ), 200
+
+    except Exception as e:
+        db_session.rollback()
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@locales_bp.route("/<int:local_id>/horarios", methods=["PUT"])
+def actualizar_horarios_local(local_id):
+    """Actualiza los horarios del local."""
+    from models import Horario
+
+    try:
+        local = db_session.query(Local).get(local_id)
+        if not local:
+            return jsonify({"error": "Local no encontrado"}), 404
+
+        data = request.get_json()
+        if not data or "horarios" not in data:
+            return jsonify({"error": "No se proporcionaron horarios"}), 400
+
+        # Eliminar horarios existentes
+        db_session.query(Horario).filter(Horario.id_local == local_id).delete()
+
+        # Crear nuevos horarios
+        from datetime import date as date_module
+
+        from models import TipoHorarioEnum
+
+        for h in data["horarios"]:
+            horario = Horario(
+                id_local=local_id,
+                tipo=TipoHorarioEnum.NORMAL,
+                fecha_inicio=date_module.today(),
+                fecha_fin=date_module(2099, 12, 31),  # Fecha lejana como "sin fin"
+                dia_semana=h["dia_semana"],
+                hora_apertura=time.fromisoformat(h["hora_apertura"])
+                if h.get("hora_apertura")
+                else time(9, 0),
+                hora_cierre=time.fromisoformat(h["hora_cierre"])
+                if h.get("hora_cierre")
+                else time(22, 0),
+                abierto=h.get("abierto", True),
+            )
+            db_session.add(horario)
+
+        db_session.commit()
+        return jsonify({"message": "Horarios actualizados correctamente"}), 200
+
+    except Exception as e:
+        db_session.rollback()
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@locales_bp.route("/<int:local_id>/redes", methods=["PUT"])
+def actualizar_redes_local(local_id):
+    """Actualiza las redes sociales del local."""
+    try:
+        local = db_session.query(Local).get(local_id)
+        if not local:
+            return jsonify({"error": "Local no encontrado"}), 404
+
+        data = request.get_json()
+        if not data or "redes" not in data:
+            return jsonify({"error": "No se proporcionaron redes sociales"}), 400
+
+        # Eliminar redes existentes
+        db_session.query(Redes).filter(Redes.id_local == local_id).delete()
+
+        # Crear nuevas redes
+        for r in data["redes"]:
+            red = Redes(
+                id_local=local_id,
+                id_tipo_red=r["id_tipo_red"],
+                url=r["url"],
+            )
+            db_session.add(red)
+
+        db_session.commit()
+        return jsonify({"message": "Redes sociales actualizadas correctamente"}), 200
+
+    except Exception as e:
+        db_session.rollback()
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
