@@ -10,8 +10,8 @@ def create_users(db):
         logger.info("    Usuarios ya existen, saltando...")
         return
 
-    # Hash para password: test123
-    password_hash = "$2b$12$q6myteznSC8775D4zt/e6OnPZVMv4jxV9ejhmMRpubGnVA1lecciO"
+    # Hash para password: Test123
+    password_hash = "$2b$12$H9bKVr0c/jk3nXAw80hxbeq9R9iGuDfZvf6/uWhcFiH3XvCFrRgRS"
     db.add_all(
         [
             Usuario(
@@ -59,6 +59,7 @@ def create_users(db):
                 contrasena=password_hash,
                 telefono="922221111",
             ),
+            # Gerente Local 1 - El Gran Sabor
             Usuario(
                 id_rol=2,
                 id_local=1,
@@ -66,6 +67,42 @@ def create_users(db):
                 correo="gerente@test.cl",
                 contrasena=password_hash,
                 telefono="911110000",
+            ),
+            # Gerente Local 2 - Bar La Terraza
+            Usuario(
+                id_rol=2,
+                id_local=2,
+                nombre="Roberto Gonzalez",
+                correo="gerente2@test.cl",
+                contrasena=password_hash,
+                telefono="911110002",
+            ),
+            # Gerente Local 3 - Restobar del Parque
+            Usuario(
+                id_rol=2,
+                id_local=3,
+                nombre="Patricia Muñoz",
+                correo="gerente3@test.cl",
+                contrasena=password_hash,
+                telefono="911110003",
+            ),
+            # Gerente Local 4 - Rincon Peruano
+            Usuario(
+                id_rol=2,
+                id_local=4,
+                nombre="Fernando Quispe",
+                correo="gerente4@test.cl",
+                contrasena=password_hash,
+                telefono="911110004",
+            ),
+            # Gerente Local 5 - The Old Pub
+            Usuario(
+                id_rol=2,
+                id_local=5,
+                nombre="Michael Brown",
+                correo="gerente5@test.cl",
+                contrasena=password_hash,
+                telefono="911110005",
             ),
         ]
     )
