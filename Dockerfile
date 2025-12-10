@@ -48,10 +48,15 @@ LABEL version="1.0.0"
 
 WORKDIR /app
 
-# Instalar solo dependencias runtime necesarias (libpq para PostgreSQL)
+# Configurar zona horaria de Chile
+ENV TZ=America/Santiago
+
+# Instalar solo dependencias runtime necesarias (libpq para PostgreSQL, tzdata para timezone)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -77,6 +82,7 @@ ENV PORT=8080 \
     PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    TZ=America/Santiago \
     # Variables para GCP Cloud Logging
     LOG_FORMAT=json
 
