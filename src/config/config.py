@@ -11,7 +11,8 @@ class Config:
 
     # Configuracion general
     JSON_SORT_KEYS = False
-    JSON_AS_ASCII = False  # Permite caracteres UTF-8 en JSON
+    JSON_AS_ASCII = False  # Permite caracteres UTF-8 en JSO
+    SEED_KEY = os.getenv("SEED_KEY", "clave-insegura-dev") #Key para poblar la base con las seeds
 
     # CORS
     ALLOWED_ORIGINS = os.environ.get(

@@ -1,20 +1,26 @@
 """
 Punto de entrada principal de la aplicacion Flask
 Backend - Sistema de Gestion de Locales
+VERSION: DEBUG_CACHE_TEST_01  <-- Agrega esto
 """
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config, get_logger, setup_logging
-from database import db_session
+from database import db_session, engine, Base
 from middleware import register_middleware
 from websockets import init_socketio, socketio
+
 
 # Configurar logging centralizado
 setup_logging()
 logger = get_logger(__name__)
 
+import sys
+print("!!! INICIANDO NUEVA VERSION - V3 !!!", file=sys.stderr)
+logger.info("!!! INICIANDO NUEVA VERSION - V3 !!!")
+# -----------------------------
 
 def create_app(config: Config | None = None) -> Flask:
     """
@@ -196,8 +202,12 @@ def _register_blueprints(app: Flask) -> None:
     ]
 
     for blueprint, name in blueprints:
-        app.register_blueprint(blueprint)
-        logger.info(f"  Blueprint '{name}' registrado")
+        # Registrar blueprint usando un nombre único en la app para evitar
+        # colisiones si el mismo nombre ya fue importado/registrado en otro
+        # contexto (por ejemplo importaciones duplicadas al desplegar).
+        unique_name = f"bp_{name}"
+        app.register_blueprint(blueprint, name=unique_name)
+        logger.info(f"  Blueprint '{name}' registrado como '{unique_name}'")
 
     logger.info(f"{len(blueprints)} blueprints registrados")
 
@@ -249,6 +259,73 @@ def _register_basic_routes(app: Flask) -> None:
         ), 200
 
     logger.info("Rutas básicas registradas (/health, /api)")
+
+    @app.route("/debug/blueprints")
+    def debug_blueprints():
+        """
+        Endpoint de debug temporal que devuelve los blueprints registrados.
+
+        En `ENV=production` exige el query param `key` igual a `SEED_KEY`.
+        Esto permite verificar en runtime si la imagen desplegada contiene
+        los cambios esperados (por ejemplo el nombre del blueprint).
+        """
+        # Proteccion en produccion
+        if app.config.get("ENV") == "production":
+            provided = request.args.get("key")
+            secret = app.config.get("SEED_KEY")
+            if not secret or provided != secret:
+                return jsonify({"error": "forbidden"}), 403
+
+        return jsonify(sorted(list(app.blueprints.keys()))), 200
+    
+    @app.route("/debug/force-seed", methods=['POST'])
+    def force_seed():
+        # 1. SEGURIDAD: Reemplazamos el bloqueo de 'production' por la llave
+        key = request.args.get("key")
+        server_key = app.config.get("SEED_KEY")
+        
+        # Si no hay llave o no coincide, bloqueamos
+        if not server_key or key != server_key:
+             logger.warning("⛔ Intento de seed no autorizado")
+             return jsonify({"error": "Forbidden"}), 403
+
+        try:
+            logger.info("🌱 Iniciando proceso de Seed...")
+            start_time = __import__("time").time() # Importamos time aquí por si acaso
+
+            # 2. ASEGURAR ESTRUCTURA: Creamos tablas primero (vital para el error de columnas)
+            # Importamos modelos para que SQLAlchemy los vea
+            import models 
+            Base.metadata.create_all(bind=engine)
+            logger.info("✅ Tablas verificadas/creadas.")
+
+            # 3. EJECUTAR EL POBLADO (Tu lógica antigua adaptada)
+            # Intentamos importar tu función de seed antigua si existe
+            try:
+                from db.seed import seed_database as seed_database_func
+                logger.info("Ejecutando seed_database() desde db/seed.py...")
+                seed_database_func()
+            except ImportError:
+                # Si no existe el archivo antiguo, usamos una lógica simple aquí
+                logger.warning("⚠️ No se encontró db/seed.py, insertando datos básicos inline...")
+                # --- TU LÓGICA DE DATOS BÁSICOS AQUÍ ---
+                # from models import Usuario
+                # if not db_session.query(Usuario).first():
+                #     db_session.add(Usuario(email="admin@restomap.com", ...))
+                #     db_session.commit()
+                # ---------------------------------------
+
+            elapsed = __import__("time").time() - start_time
+            return jsonify({
+                "status": "success", 
+                "message": f"Base de datos poblada en {elapsed:.2f}s",
+                "tables": list(Base.metadata.tables.keys())
+            })
+
+        except Exception as e:
+            logger.error(f"❌ Error en seed: {e}")
+            db_session.rollback()
+            return jsonify({"error": str(e)}), 500
 
 
 # Crear instancia de la aplicacion
