@@ -480,8 +480,8 @@ class Local(Base):
     correo = Column(String(50), nullable=False, unique=True, index=True)
 
     # Campos para registro de empresa
-    rut_empresa = Column(String(12), unique=True, nullable=True, index=True)
-    razon_social = Column(String(200), nullable=True)
+    rut_empresa = Column(String(12), unique=True, nullable=False, index=True)
+    razon_social = Column(String(200), nullable=False)
     glosa_giro = Column(String(200), nullable=True)
     terminos_aceptados = Column(Boolean, nullable=False, default=False)
     fecha_aceptacion_terminos = Column(DateTime(timezone=True), nullable=True)

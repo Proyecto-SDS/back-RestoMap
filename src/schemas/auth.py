@@ -138,6 +138,7 @@ class RegisterEmpresaSchema(BaseModel):
     # Datos del Local/Empresa
     rut_empresa: str = Field(..., min_length=9, max_length=12)
     razon_social: str = Field(..., min_length=3)
+    glosa_giro: str | None = None  # Giro de la empresa (viene del SII en paso 1)
     nombre_local: str = Field(..., min_length=2, max_length=200)
     telefono_local: str
     correo_local: EmailStr
@@ -155,7 +156,8 @@ class RegisterEmpresaSchema(BaseModel):
     nombre_gerente: str = Field(..., min_length=2)
     correo_gerente: EmailStr
     telefono_gerente: str
-    contrasena: str = Field(..., min_length=6)
+    contrasena: str | None = Field(None, min_length=6)
+    id_persona: int | None = None  # Si se proporciona, vincular usuario existente
 
     # Terminos y condiciones B2B
     acepta_terminos: bool = Field(..., description="Acepta terminos y condiciones B2B")

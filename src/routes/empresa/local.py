@@ -199,6 +199,7 @@ def obtener_local_info():
                 "telefono": local.telefono,
                 "correo": local.correo,
                 "tipo_local": local.tipo_local.nombre if local.tipo_local else None,
+                "rut_empresa": local.rut_empresa,
                 "direccion": {
                     "calle": local.direccion.calle if local.direccion else None,
                     "numero": local.direccion.numero if local.direccion else None,
