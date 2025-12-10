@@ -30,34 +30,34 @@ jobs:
       id-token: 'write'
 
     steps:
-      - name: ⬇️ Checkout code
+      - name: ⬇Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch || github.ref }}
 
       # --- PASO DE SEGURIDAD PARA QUE VEAS QUE EL CÓDIGO ES EL NUEVO ---
-      - name: 🕵️ DEBUG - Verificar código
+      - name: DEBUG - Verificar código
         run: |
           echo "Verificando src/main.py..."
           # Buscamos si existe la línea problemática
           if grep -F "app.register_blueprint(locales_bp)" src/main.py; then
-             echo "❌ PELIGRO: El código TIENE el error viejo."
+             echo "PELIGRO: El código TIENE el error viejo."
           else
-             echo "✅ CORRECTO: El código NO tiene el error viejo."
+             echo "CORRECTO: El código NO tiene el error viejo."
           fi
           # Muestra las líneas críticas
           cat src/main.py | sed -n '110,140p'
 
-      - name: 🔑 Autenticación con GCP
+      - name: Autenticación con GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/414435283954/locations/global/workloadIdentityPools/github-pool/providers/github-provider1'
           service_account: 'github-deploy-sa@restomap-478918.iam.gserviceaccount.com'
 
-      - name: 🏗️ Setup Cloud SDK
+      - name: Setup Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: 🔨 Build y Push Docker
+      - name: Build y Push Docker
         id: build-push
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev
@@ -73,7 +73,7 @@ jobs:
           
           echo "image_uri=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: 🚀 Deploy Cloud Run (Creación Automática)
+      - name: Deploy Cloud Run (Creación Automática)
         id: deploy
         run: |
           echo "Generando archivo de entorno..."
@@ -107,8 +107,8 @@ jobs:
           SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format 'value(status.url)')
           echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
 
-      - name: ✅ Resumen
+      - name: Resumen
         if: success()
         run: |
-          echo "### 🚀 Servicio Creado/Actualizado"
-          echo "🔗 [${{ steps.deploy.outputs.service_url }}](${{ steps.deploy.outputs.service_url }})"
+          echo "### Servicio Creado/Actualizado"
+          echo "[${{ steps.deploy.outputs.service_url }}](${{ steps.deploy.outputs.service_url }})"

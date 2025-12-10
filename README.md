@@ -2,9 +2,9 @@
 
 Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de locales, pedidos y reservas.
 
-🚀 **Optimizado para Docker y Google Cloud Platform (GCP Cloud Run)**
+**Optimizado para Docker y Google Cloud Platform (GCP Cloud Run)**
 
-## 📋 Tabla de Contenido
+## Tabla de Contenido
 
 - [Requisitos](#requisitos)
 - [Inicio Rápido con Docker](#inicio-rápido-con-docker)
@@ -21,7 +21,7 @@ Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de local
 - **Docker Desktop** 24.0+
 - **Docker Compose** 2.20+
 
-**✅ No se requiere instalación local de Python ni PostgreSQL** - todo se ejecuta en contenedores.
+**No se requiere instalación local de Python ni PostgreSQL** - todo se ejecuta en contenedores.
 
 ### Para Desarrollo Local sin Docker (Opcional)
 
@@ -43,7 +43,7 @@ Ver la [Guía de Poetry](.guias/POETRY_GUIDE.md) para más información.
 
 ---
 
-## 🚀 Inicio Rápido con Docker
+## Inicio Rápido con Docker
 
 ```bash
 # 1. Clonar repositorio
@@ -67,7 +67,7 @@ docker-compose up -d backend
 curl http://localhost:5000/health
 ```
 
-**📖 Para deployment en GCP Cloud Run, ver [DEPLOYMENT.md](./DEPLOYMENT.md)**
+**Para deployment en GCP Cloud Run, ver [DEPLOYMENT.md](./DEPLOYMENT.md)**
 
 ---
 

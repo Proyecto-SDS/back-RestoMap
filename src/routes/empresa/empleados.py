@@ -4,7 +4,6 @@ Prefix: /api/empresa/empleados/*
 """
 
 import secrets
-from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 from pydantic import BaseModel, EmailStr, ValidationError
@@ -212,7 +211,11 @@ def eliminar_empleado(empleado_id, user_id, user_rol, id_local):
 @requerir_roles_empresa("gerente")
 def crear_invitacion(user_id, user_rol, id_local):
     """
-    Crear invitación para nuevo empleado
+    Crear invitación para nuevo empleado o asignar directamente si el usuario existe.
+
+    Si el usuario ya está registrado y no tiene local, se le asigna automáticamente.
+    Si el usuario ya tiene un local asignado, se retorna un error.
+    Si el usuario no existe, se crea una invitación pendiente.
 
     Body:
         {
@@ -238,69 +241,61 @@ def crear_invitacion(user_id, user_rol, id_local):
         if not local:
             return jsonify({"error": "Local no encontrado"}), 404
 
-        # Verificar si el usuario ya es empleado del local
-        stmt = select(Usuario).where(
-            Usuario.correo == data.correo.lower(), Usuario.id_local == id_local
-        )
-        usuario_existente = db.execute(stmt).scalar_one_or_none()
-        if usuario_existente:
-            return jsonify({"error": "Este usuario ya es empleado de este local"}), 400
-
-        # Verificar si ya existe una invitación pendiente
-        stmt = select(InvitacionEmpleado).where(
-            InvitacionEmpleado.correo == data.correo.lower(),
-            InvitacionEmpleado.id_local == id_local,
-            InvitacionEmpleado.estado == EstadoInvitacionEnum.PENDIENTE,
-        )
-        invitacion_existente = db.execute(stmt).scalar_one_or_none()
-        if invitacion_existente:
-            return jsonify(
-                {"error": "Ya existe una invitación pendiente para este correo"}
-            ), 400
-
         # Obtener el ID del rol
         stmt = select(Rol).where(Rol.nombre == data.rol)
         rol_obj = db.execute(stmt).scalar_one_or_none()
         if not rol_obj:
             return jsonify({"error": "Rol no encontrado en el sistema"}), 404
 
-        # Crear invitación
-        token = generar_token_invitacion()
-        expiracion = datetime.now() + timedelta(days=7)  # Expira en 7 días
+        # Buscar si el usuario existe en el sistema
+        stmt = select(Usuario).where(Usuario.correo == data.correo.lower())
+        usuario_existente = db.execute(stmt).scalar_one_or_none()
 
-        nueva_invitacion = InvitacionEmpleado(
-            id_local=id_local,
-            id_rol=rol_obj.id,
-            invitado_por=user_id,
-            correo=data.correo.lower(),
-            token=token,
-            estado=EstadoInvitacionEnum.PENDIENTE,
-            expira_el=expiracion,
-        )
+        if usuario_existente:
+            # El usuario existe, verificar si ya tiene un local asignado
+            if usuario_existente.id_local is not None:
+                if usuario_existente.id_local == id_local:
+                    return jsonify(
+                        {"error": "Este usuario ya es empleado de este local"}
+                    ), 400
+                else:
+                    return jsonify(
+                        {
+                            "error": "Este usuario ya está registrado como empleado en otro local. "
+                            "Debe ser removido del otro local antes de poder unirse a este."
+                        }
+                    ), 400
 
-        db.add(nueva_invitacion)
-        db.commit()
-        db.refresh(nueva_invitacion)
+            # El usuario existe pero no tiene local - asignar directamente
+            usuario_existente.id_local = id_local
+            usuario_existente.id_rol = rol_obj.id
+            db.commit()
 
-        # TODO: Enviar email con el link de invitación
-        # link_invitacion = f"{FRONTEND_URL}/invitacion/{token}"
-        # enviar_email_invitacion(data.correo, local.nombre, data.rol, link_invitacion)
+            logger.info(
+                f"Usuario {usuario_existente.correo} asignado automáticamente al local {local.nombre} como {data.rol}"
+            )
 
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f"Empleado agregado exitosamente. {usuario_existente.nombre} ahora es {data.rol} en {local.nombre}.",
+                    "auto_aceptado": True,
+                    "empleado": {
+                        "id": usuario_existente.id,
+                        "nombre": usuario_existente.nombre,
+                        "correo": usuario_existente.correo,
+                        "rol": data.rol,
+                        "local": local.nombre,
+                    },
+                }
+            ), 201
+
+        # El usuario no existe en el sistema - retornar error
         return jsonify(
             {
-                "success": True,
-                "message": "Invitación creada exitosamente",
-                "invitacion": {
-                    "id": nueva_invitacion.id,
-                    "correo": nueva_invitacion.correo,
-                    "rol": data.rol,
-                    "local": local.nombre,
-                    "expira_el": nueva_invitacion.expira_el.isoformat(),
-                },
-                "_dev_token": token,
-                "_dev_mensaje": f"En producción, se enviaría email a {data.correo}",
+                "error": "Este correo no está registrado en RestoMap. El usuario debe crear una cuenta primero."
             }
-        ), 201
+        ), 400
     except Exception as e:
         logger.error(f"Error al crear invitación: {e}")
         db.rollback()
