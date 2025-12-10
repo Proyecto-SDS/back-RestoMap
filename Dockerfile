@@ -52,6 +52,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -75,6 +76,7 @@ USER appuser
 
 # Variables de entorno para Python y la app
 ENV PORT=8080 \
+    TZ=America/Santiago \
     ENV=production \
     PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
