@@ -56,7 +56,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
     tzdata \
-    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -70,6 +69,8 @@ COPY alembic.ini pyproject.toml ./
 COPY src ./src
 COPY scripts ./scripts
 
+RUN grep -F "app.register_blueprint(locales_bp)" src/main.py && echo "!!! ALERTA: DOCKER ESTA VIENDO EL CODIGO VIEJO !!!" && exit 1 || echo ">>> EXITO: No se encontró la línea vieja."
+
 # Crear usuario no-root para seguridad (requerido por Cloud Run)
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
@@ -78,6 +79,7 @@ USER appuser
 
 # Variables de entorno para Python y la app
 ENV PORT=8080 \
+    TZ=America/Santiago \
     ENV=production \
     PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
@@ -94,11 +96,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 EXPOSE ${PORT}
 
 # Comando para ejecutar con Gunicorn + Eventlet
-# - worker-class eventlet: habilita soporte WebSocket
-# - workers: 1 para demo (eventlet maneja concurrencia internamente)
-# - timeout: 0 para Cloud Run (maneja timeouts externamente)
-CMD exec gunicorn \
-    --bind 0.0.0.0:${PORT} \
+# Usar forma JSON y expansión de shell para garantizar que la variable
+# `PORT` se evalúe en tiempo de ejecución y tenga un fallback a 8080.
+# Esto evita problemas cuando la imagen anterior no tenía PORT o Cloud Run
+# no la inyectó correctamente.
+CMD ["sh", "-c", "exec gunicorn \
+    --bind 0.0.0.0:${PORT:-8080} \
     --worker-class eventlet \
     --workers 1 \
     --timeout 0 \
@@ -106,4 +109,4 @@ CMD exec gunicorn \
     --error-logfile - \
     --capture-output \
     --enable-stdio-inheritance \
-    src.main:app
+    src.main:app"]
