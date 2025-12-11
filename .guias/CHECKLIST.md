@@ -399,5 +399,5 @@ Si todos los checks están , estás listo para:
 
 ---
 
-**Última actualización:** Diciembre 2024  
+**Última actualización:** Diciembre 2025
 **Versión:** 1.0
