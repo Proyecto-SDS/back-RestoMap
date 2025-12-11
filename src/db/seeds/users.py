@@ -107,4 +107,4 @@ def create_users(db):
         ]
     )
     db.commit()
-    logger.info("    ✓ Usuarios insertados (password: test123)")
+    logger.info("    ✓ Usuarios insertados (password: Test123)")

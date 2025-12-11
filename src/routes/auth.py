@@ -18,7 +18,6 @@ from models.models import Direccion, Local, Rol, Usuario
 from schemas import LoginSchema, ProfileUpdateSchema, RegisterSchema
 from schemas.auth import RegisterEmpresaSchema
 from services.rut_service import (
-    consultar_rut_sre,
     validar_digito_verificador,
     validar_formato_rut,
 )
@@ -456,17 +455,14 @@ def validar_rut(rut: str):
     Response 200:
         {
             "valido": true,
-            "existe": true,
-            "razon_social": "EMPRESA XYZ SPA",
-            "glosa_giro": "RESTAURANTES, BARES Y CANTINAS"
+            "razon_social": null,
+            "glosa_giro": null
         }
 
     Response 400:
         {"error": "Formato de RUT invalido"}
         {"error": "Digito verificador incorrecto"}
-
-    Response 404:
-        {"error": "RUT no encontrado en el SII"}
+        {"error": "Este RUT ya esta registrado en la plataforma"}
     """
     try:
         # Validar formato
@@ -475,7 +471,7 @@ def validar_rut(rut: str):
                 {"error": "Formato de RUT invalido. Use formato XX.XXX.XXX-X"}
             ), 400
 
-        # Validar digito verificador
+        # Validar digito verificador con modulo 11
         if not validar_digito_verificador(rut):
             return jsonify({"error": "Digito verificador incorrecto"}), 400
 
@@ -483,7 +479,7 @@ def validar_rut(rut: str):
         # En BD se almacena como: 12345678-9
         rut_limpio = rut.replace(".", "")
 
-        # PRIMERO: Verificar si ya existe en nuestra BD
+        # Verificar si ya existe en nuestra BD
         db = next(get_db())
         local_existente = db.execute(
             select(Local).where(Local.rut_empresa == rut_limpio)
@@ -494,21 +490,12 @@ def validar_rut(rut: str):
                 {"error": "Este RUT ya esta registrado en la plataforma"}
             ), 400
 
-        # SEGUNDO: Consultar API SRE.cl (mas rapida que SimpleAPI)
-        resultado = consultar_rut_sre(rut)
-
-        if not resultado["valido"]:
-            return jsonify({"error": resultado["error"]}), 400
-
-        if not resultado["existe"]:
-            return jsonify({"error": "RUT no encontrado en el SII"}), 404
-
+        # RUT valido (solo validacion local con modulo 11)
         return jsonify(
             {
                 "valido": True,
-                "existe": True,
-                "razon_social": resultado["razon_social"],
-                "glosa_giro": resultado["glosa_giro"],
+                "razon_social": None,
+                "glosa_giro": None,
             }
         ), 200
 
