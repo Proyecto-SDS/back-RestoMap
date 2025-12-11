@@ -2,8 +2,42 @@
 
 Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de locales, pedidos y reservas.
 
+## Inicio Rápido (Desarrollo Local)
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/Proyecto-SDS/back-RestoMap.git
+cd back-RestoMap
+
+# 2. Ejecutar script de configuración
+./scripts/setup_local.sh  # Linux/macOS
+# .\scripts\setup_local.ps1  # Windows
+
+# 3. Editar .env con tus credenciales de PostgreSQL
+
+# 4. Asegurarse de que PostgreSQL esté corriendo
+
+# 5. Crear la base de datos
+sudo -u postgres psql
+CREATE USER myuser WITH PASSWORD 'mypassword';
+CREATE DATABASE mydb OWNER myuser;
+GRANT ALL PRIVILEGES ON DATABASE mydb TO myuser;
+\q
+
+# 6. Activar entorno virtual e inicializar base de datos
+source venv/bin/activate  # Linux/macOS
+# venv\Scripts\activate  # Windows
+./scripts/init_db.sh
+
+# 7. Ejecutar backend
+python src/main.py
+```
+
+La API estará disponible en `http://localhost:5000`
+
 ## Tabla de Contenido
 
+- [Inicio Rápido](#inicio-rápido-desarrollo-local)
 - [Requisitos](#requisitos)
 - [Configuración](#configuración)
 - [Desarrollo Local (Sin Docker)](#desarrollo-local-sin-docker)
