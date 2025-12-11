@@ -5,22 +5,28 @@ Sistema backend basado en Flask + SQLAlchemy + PostgreSQL para gestión de local
 ## Tabla de Contenido
 
 - [Requisitos](#requisitos)
-- [Estructura del Proyecto](#estructura-del-proyecto)
 - [Configuración](#configuración)
-- [Uso con Docker](#uso-con-docker)
+- [Desarrollo Local (Sin Docker)](#desarrollo-local-sin-docker)
+- [Uso con Docker (Opcional)](#uso-con-docker-opcional)
 - [Migraciones de Base de Datos](#migraciones-de-base-de-datos)
 - [API Endpoints](#api-endpoints)
 
 ## Requisitos
 
+### Desarrollo Local (Recomendado)
+
+- Python 3.12 o superior
+- PostgreSQL 14 o superior
+- pip (gestor de paquetes de Python)
+
+### Desarrollo con Docker (Opcional)
+
 - Docker Desktop
 - Docker Compose
 
-**No se requiere instalación local de Python ni PostgreSQL** - todo se ejecuta en contenedores Docker.
-
 ## Configuración
 
-### 1. Variables de Entorno
+### Variables de Entorno
 
 Copia el archivo `.env.example` a `.env`:
 
@@ -31,14 +37,14 @@ cp .env.example .env
 Edita `.env` con tus credenciales:
 
 ```env
-# Base de Datos
+# Base de Datos (Configuración Local)
 DB_USER=tu_usuario
 DB_PASSWORD=tu_contraseña
-DB_HOST=localhost       # 'db' en Docker
+DB_HOST=localhost       # localhost para desarrollo local, 'db' si usas Docker
 DB_PORT=5432
 DB_NAME=tu_bd
 
-# PostgreSQL (Docker)
+# PostgreSQL (Solo para Docker - Opcional)
 POSTGRES_USER=tu_usuario
 POSTGRES_PASSWORD=tu_contraseña
 POSTGRES_DB=tu_bd
@@ -46,7 +52,147 @@ POSTGRES_DB=tu_bd
 # Configuración General
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 # Lista separada por comas
 ENV=development # 'production' o 'development'
+JWT_SECRET_KEY=dev-secret-key-change-in-production-2025
 ```
+
+## Desarrollo Local (Sin Docker)
+
+Esta es la forma **recomendada** de trabajar con el proyecto durante el desarrollo.
+
+### Paso 1: Instalar PostgreSQL
+
+Instala PostgreSQL en tu sistema:
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+```
+
+**macOS (con Homebrew):**
+```bash
+brew install postgresql@14
+brew services start postgresql@14
+```
+
+**Windows:**
+Descarga e instala desde [postgresql.org](https://www.postgresql.org/download/windows/)
+
+### Paso 2: Crear la Base de Datos
+
+```bash
+# Conectarse a PostgreSQL como superusuario
+sudo -u postgres psql
+
+# Crear usuario y base de datos
+CREATE USER tu_usuario WITH PASSWORD 'tu_contraseña';
+CREATE DATABASE tu_bd OWNER tu_usuario;
+GRANT ALL PRIVILEGES ON DATABASE tu_bd TO tu_usuario;
+\q
+```
+
+### Paso 3: Configurar Variables de Entorno
+
+Copia y edita el archivo `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Asegúrate de que `DB_HOST=localhost` en tu archivo `.env`.
+
+### Paso 4: Crear Entorno Virtual de Python
+
+```bash
+# Crear entorno virtual
+python3 -m venv venv
+
+# Activar entorno virtual
+# En Linux/macOS:
+source venv/bin/activate
+
+# En Windows:
+venv\Scripts\activate
+```
+
+### Paso 5: Instalar Dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+### Paso 6: Inicializar la Base de Datos
+
+```bash
+# Opción 1: Usando el script de inicialización
+chmod +x scripts/init_db.sh
+./scripts/init_db.sh
+
+# Opción 2: Manualmente
+python src/init_tables.py
+python src/db/seed.py
+```
+
+### Paso 7: Ejecutar el Backend
+
+```bash
+# Asegúrate de que el entorno virtual esté activado
+python src/main.py
+```
+
+El servidor estará disponible en `http://localhost:5000`
+
+### Paso 8: Verificar que Funcione
+
+En otra terminal:
+
+```bash
+# Health check
+curl http://localhost:5000/
+
+# Ver locales
+curl http://localhost:5000/locales/
+```
+
+### Uso Diario (Desarrollo Local)
+
+```bash
+# Activar entorno virtual
+source venv/bin/activate  # Linux/macOS
+# venv\Scripts\activate   # Windows
+
+# Ejecutar backend
+python src/main.py
+
+# Para detener: Ctrl+C
+```
+
+### Migraciones con Alembic (Desarrollo Local)
+
+```bash
+# Activar entorno virtual primero
+source venv/bin/activate
+
+# Generar migración
+alembic revision --autogenerate -m "Descripción del cambio"
+
+# Aplicar migración
+alembic upgrade head
+
+# Ver historial
+alembic history
+
+# Ver migración actual
+alembic current
+
+# Revertir migración
+alembic downgrade -1
+```
+
+## Uso con Docker (Opcional)
+
+**Nota:** Docker es opcional. Se recomienda usar el desarrollo local para mayor simplicidad.
 
 ## Producción con Docker
 
@@ -69,9 +215,13 @@ docker run -p 5000:5000 \
 
 > **Nota:** En producción (GCP), no uses `docker-compose` para el despliegue del backend. Usa esta imagen individual conectada a una instancia de Cloud SQL.
 
-## Uso con Docker
+### Uso con Docker Compose (Desarrollo Opcional)
 
-### Primera Vez - Paso a Paso
+### Uso con Docker Compose (Desarrollo Opcional)
+
+**Importante:** Si prefieres usar Docker, sigue estas instrucciones. De lo contrario, usa el [desarrollo local](#desarrollo-local-sin-docker).
+
+#### Primera Vez - Paso a Paso
 
 #### Paso 1: Configurar Variables de Entorno
 
@@ -242,7 +392,44 @@ Los servicios con `profiles` solo se ejecutan cuando los invocas explícitamente
 
 Este proyecto usa **Alembic** para gestionar el schema de la base de datos.
 
-### Crear una Migración
+### Desarrollo Local
+
+Cuando modifiques modelos en `src/models/models.py`:
+
+```bash
+# Activar entorno virtual
+source venv/bin/activate
+
+# Generar migración automáticamente
+alembic revision --autogenerate -m "Descripción del cambio"
+
+# Aplicar migración
+alembic upgrade head
+```
+
+### Ver Estado de Migraciones
+
+```bash
+# Ver historial
+alembic history
+
+# Ver migración actual
+alembic current
+```
+
+### Revertir Migración
+
+```bash
+# Revertir última migración
+alembic downgrade -1
+
+# Revertir a versión específica
+alembic downgrade <revision_id>
+```
+
+### Con Docker (Opcional)
+
+### Con Docker (Opcional)
 
 Cuando modifiques modelos en `src/models/models.py`:
 
@@ -254,7 +441,7 @@ docker-compose run --rm app alembic revision --autogenerate -m "Descripción del
 docker-compose run --rm app alembic upgrade head
 ```
 
-### Ver Estado de Migraciones
+### Ver Estado de Migraciones (Docker)
 
 ```bash
 # Ver historial
@@ -264,7 +451,7 @@ docker-compose run --rm app alembic history
 docker-compose run --rm app alembic current
 ```
 
-### Revertir Migración
+### Revertir Migración (Docker)
 
 ```bash
 # Revertir última migración
@@ -283,8 +470,17 @@ El archivo `src/db/seed.py` puebla la base de datos con:
 
 ### Ejecutar Seed Manualmente
 
+**Desarrollo Local:**
 ```bash
-# Dentro de Docker
+# Activar entorno virtual
+source venv/bin/activate
+
+# Ejecutar seed
+python src/db/seed.py
+```
+
+**Con Docker:**
+```bash
 docker-compose run --rm app python src/db/seed.py
 ```
 
@@ -365,16 +561,21 @@ graph TD
 
 ### Puerto 5432 en uso
 
-Si PostgreSQL ya está corriendo en tu máquina:
+Si PostgreSQL ya está corriendo en tu máquina y no puedes usar Docker:
 
 ```bash
+# Detener PostgreSQL local (Linux)
+sudo systemctl stop postgresql
+
 # Detener PostgreSQL local (Windows)
 Stop-Service postgresql
 
-# O cambiar puerto en docker-compose.yml
+# O cambiar puerto en docker-compose.yml para Docker
 ports:
   - "5433:5432"  # Usar puerto 5433 en host
 ```
+
+Para desarrollo local, asegúrate de que PostgreSQL esté corriendo en el puerto 5432 o actualiza `DB_PORT` en tu archivo `.env`.
 
 ### Permisos en scripts/init_db.sh
 
@@ -385,7 +586,43 @@ chmod +x scripts/init_db.sh
 
 ### Errores de importación
 
+**Desarrollo Local:**
+Asegúrate de tener activado el entorno virtual y de ejecutar desde la raíz del proyecto:
+```bash
+source venv/bin/activate
+export PYTHONPATH=/ruta/absoluta/al/proyecto/src
+python src/main.py
+```
+
+**Con Docker:**
 Asegúrate que `PYTHONPATH=/app/src` esté configurado en `docker-compose.yml`.
+
+### Error: "No module named 'psycopg2'"
+
+```bash
+# Activar entorno virtual
+source venv/bin/activate
+
+# Reinstalar dependencias
+pip install -r requirements.txt
+```
+
+### Error de conexión a PostgreSQL
+
+Verifica que PostgreSQL esté corriendo:
+
+**Linux:**
+```bash
+sudo systemctl status postgresql
+```
+
+**macOS:**
+```bash
+brew services list
+```
+
+**Windows:**
+Verifica en Servicios que PostgreSQL esté corriendo.
 
 ## Contacto
 
