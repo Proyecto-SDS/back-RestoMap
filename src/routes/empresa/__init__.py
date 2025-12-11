@@ -82,6 +82,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
+    from routes.empresa.categorias import categorias_bp
     from routes.empresa.debug import debug_bp
     from routes.empresa.empleados import empleados_bp
     from routes.empresa.encomiendas import encomiendas_bp
@@ -94,6 +95,7 @@ try:
     from routes.empresa.stats import stats_bp
 
     # Registrar sub-blueprints
+    empresa_bp.register_blueprint(categorias_bp)
     empresa_bp.register_blueprint(debug_bp)
     empresa_bp.register_blueprint(local_bp)
     empresa_bp.register_blueprint(mesas_bp)
@@ -109,5 +111,6 @@ try:
 except Exception as e:
     logger.error(f"Error importando/registrando sub-blueprints de empresa: {e}")
     import traceback
+
     traceback.print_exc()
     raise

@@ -4,23 +4,24 @@ Backend - Sistema de Gestion de Locales
 VERSION: DEBUG_CACHE_TEST_01  <-- Agrega esto
 """
 
+import sys
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config, get_logger, setup_logging
-from database import db_session, engine, Base
+from database import Base, db_session, engine
 from middleware import register_middleware
 from websockets import init_socketio, socketio
-
 
 # Configurar logging centralizado
 setup_logging()
 logger = get_logger(__name__)
 
-import sys
 print("!!! INICIANDO NUEVA VERSION - V3 !!!", file=sys.stderr)
 logger.info("!!! INICIANDO NUEVA VERSION - V3 !!!")
 # -----------------------------
+
 
 def create_app(config: Config | None = None) -> Flask:
     """
@@ -277,25 +278,26 @@ def _register_basic_routes(app: Flask) -> None:
                 return jsonify({"error": "forbidden"}), 403
 
         return jsonify(sorted(list(app.blueprints.keys()))), 200
-    
-    @app.route("/debug/force-seed", methods=['POST'])
+
+    @app.route("/debug/force-seed", methods=["POST"])
     def force_seed():
         # 1. SEGURIDAD: Reemplazamos el bloqueo de 'production' por la llave
         key = request.args.get("key")
         server_key = app.config.get("SEED_KEY")
-        
+
         # Si no hay llave o no coincide, bloqueamos
         if not server_key or key != server_key:
-             logger.warning("⛔ Intento de seed no autorizado")
-             return jsonify({"error": "Forbidden"}), 403
+            logger.warning("⛔ Intento de seed no autorizado")
+            return jsonify({"error": "Forbidden"}), 403
 
         try:
             logger.info("🌱 Iniciando proceso de Seed...")
-            start_time = __import__("time").time() # Importamos time aquí por si acaso
+            start_time = __import__("time").time()  # Importamos time aquí por si acaso
 
             # 2. ASEGURAR ESTRUCTURA: Creamos tablas primero (vital para el error de columnas)
             # Importamos modelos para que SQLAlchemy los vea
-            import models 
+            import models  # noqa: F401
+
             Base.metadata.create_all(bind=engine)
             logger.info("✅ Tablas verificadas/creadas.")
 
@@ -303,11 +305,14 @@ def _register_basic_routes(app: Flask) -> None:
             # Intentamos importar tu función de seed antigua si existe
             try:
                 from db.seed import seed_database as seed_database_func
+
                 logger.info("Ejecutando seed_database() desde db/seed.py...")
                 seed_database_func()
             except ImportError:
                 # Si no existe el archivo antiguo, usamos una lógica simple aquí
-                logger.warning("⚠️ No se encontró db/seed.py, insertando datos básicos inline...")
+                logger.warning(
+                    "⚠️ No se encontró db/seed.py, insertando datos básicos inline..."
+                )
                 # --- TU LÓGICA DE DATOS BÁSICOS AQUÍ ---
                 # from models import Usuario
                 # if not db_session.query(Usuario).first():
@@ -316,11 +321,13 @@ def _register_basic_routes(app: Flask) -> None:
                 # ---------------------------------------
 
             elapsed = __import__("time").time() - start_time
-            return jsonify({
-                "status": "success", 
-                "message": f"Base de datos poblada en {elapsed:.2f}s",
-                "tables": list(Base.metadata.tables.keys())
-            })
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": f"Base de datos poblada en {elapsed:.2f}s",
+                    "tables": list(Base.metadata.tables.keys()),
+                }
+            )
 
         except Exception as e:
             logger.error(f"❌ Error en seed: {e}")

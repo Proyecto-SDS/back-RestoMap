@@ -45,29 +45,6 @@ def add_base64_prefix(data):
     return f"data:image/{mime};base64,{data}"
 
 
-def add_base64_prefix(data):
-    """
-    Agrega el prefijo data:image/...;base64, necesario para que el navegador
-    interprete la imagen correctamente si solo tenemos el string base64.
-    """
-    if not data:
-        return None
-
-    if data.startswith("data:"):
-        return data
-
-    if data.startswith("/9j/"):
-        mime = "jpeg"
-    elif data.startswith("iVBORw"):
-        mime = "png"
-    elif data.startswith("UklGR"):
-        mime = "webp"
-    else:
-        mime = "jpeg"
-
-    return f"data:image/{mime};base64,{data}"
-
-
 @locales_bp.route("/", methods=["GET"])
 def obtener_locales():
     """Obtiene todos los locales de la base de datos con informacion completa."""

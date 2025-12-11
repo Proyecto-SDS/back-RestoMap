@@ -415,16 +415,27 @@ class TipoCategoria(Base):
 
 class Categoria(Base):
     __tablename__ = "categoria"
+    __table_args__ = (
+        UniqueConstraint("nombre", "id_local", name="uq_categoria_nombre_local"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
+    id_local = Column(
+        Integer,
+        ForeignKey("local.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     id_tipo_categoria = Column(
         Integer,
         ForeignKey("tipo_categoria.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
-    nombre = Column(String(100), nullable=False, unique=True)
+    nombre = Column(String(100), nullable=False)
+    eliminado_el = Column(DateTime, nullable=True, default=None)
 
+    local = relationship("Local", lazy="joined")
     tipo_categoria = relationship(
         "TipoCategoria", back_populates="categorias", lazy="joined"
     )

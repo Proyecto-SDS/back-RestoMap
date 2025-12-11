@@ -2,6 +2,7 @@ from datetime import date, time
 
 from config import get_logger
 from models import (
+    Categoria,
     Direccion,
     EstadoMesaEnum,
     Foto,
@@ -140,6 +141,38 @@ def create_locals(db):
         logger.info("    ✓ Locales de ejemplo insertados")
     else:
         logger.info("    Locales ya existen")
+
+    # ============ Categorias por Local ============
+    logger.info("  → Insertando Categorías de ejemplo...")
+    if db.query(Categoria).count() == 0:
+        # Lista de categorías base que cada local tendrá
+        categorias_base = [
+            # Comida (id_tipo_categoria=1)
+            ("Entradas", 1),
+            ("Platos Principales", 1),
+            ("Postres", 1),
+            # Bebida (id_tipo_categoria=2)
+            ("Bebidas", 2),
+            ("Cervezas", 2),
+            ("Vinos", 2),
+            ("Cocteles", 2),
+            ("Cafes", 2),
+        ]
+
+        # Crear categorías para cada local (1 al 5)
+        for id_local in range(1, 6):
+            for nombre, tipo_id in categorias_base:
+                db.add(
+                    Categoria(
+                        id_local=id_local,
+                        nombre=nombre,
+                        id_tipo_categoria=tipo_id,
+                    )
+                )
+        db.commit()
+        logger.info("    ✓ Categorías insertadas para todos los locales")
+    else:
+        logger.info("    Categorías ya existen")
 
     # ============ Horarios ============
     logger.info("  → Insertando Horarios de ejemplo...")
@@ -415,7 +448,7 @@ def create_locals(db):
                 Redes(
                     id_local=1,
                     id_tipo_red=2,
-                    nombre_usuario="@gransabor",
+                    nombre_usuario="gransabor",
                     url="https://instagram.com/gransabor",
                 ),
                 Redes(
@@ -427,7 +460,7 @@ def create_locals(db):
                 Redes(
                     id_local=2,
                     id_tipo_red=2,
-                    nombre_usuario="@laterraza",
+                    nombre_usuario="laterraza",
                     url="https://instagram.com/laterraza",
                 ),
             ]
