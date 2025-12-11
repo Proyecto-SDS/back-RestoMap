@@ -661,3 +661,60 @@ Verifica en Servicios que PostgreSQL esté corriendo.
 ## Contacto
 
 Para dudas o sugerencias, contacta al equipo de desarrollo.
+
+## Desarrollo Local vs Docker
+
+### ¿Cuándo usar desarrollo local?
+
+✅ **Recomendado para:**
+- Desarrollo diario del backend
+- Debugging y testing rápido
+- Modificación de código Python
+- Desarrollo de nuevas features
+- Aprendizaje del proyecto
+
+**Ventajas:**
+- Inicio más rápido
+- Sin overhead de contenedores
+- Hot-reload nativo de Flask
+- Fácil debugging con IDE
+- Menor uso de recursos
+
+### ¿Cuándo usar Docker?
+
+⚠️ **Opcional para:**
+- Testing de integración completa
+- Simular ambiente de producción
+- Desarrollo del frontend junto con backend
+- Trabajar con múltiples servicios simultáneamente
+
+**Ventajas:**
+- Entorno aislado y reproducible
+- Fácil integración con otros servicios
+- Configuración de red simplificada
+- Similar al ambiente de producción
+
+### Recomendación
+
+Para el desarrollo del backend, **usa el entorno local**. Es más simple, rápido y fácil de debuggear. Reserva Docker para cuando necesites:
+- Probar la integración completa con frontend
+- Validar antes de hacer deploy a producción
+- Trabajar con servicios adicionales (Redis, etc.)
+
+## Resumen de Cambios vs Versión Anterior
+
+Esta rama (`capsula2-backend`) introduce soporte para desarrollo **sin Docker**:
+
+### Nuevos archivos:
+- `scripts/setup_local.sh` - Script de configuración para Linux/macOS
+- `scripts/setup_local.ps1` - Script de configuración para Windows
+
+### Archivos modificados:
+- `README.md` - Documentación completa de desarrollo local
+- `.env.example` - Comentarios actualizados para desarrollo local
+
+### Docker sigue disponible:
+Los archivos Docker no han sido eliminados y pueden seguir siendo utilizados opcionalmente:
+- `docker-compose.yml` - Para desarrollo con Docker (opcional)
+- `Dockerfile` - Para builds de producción
+- `dockerfile.backend` - Para desarrollo con Docker Compose
