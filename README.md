@@ -251,8 +251,6 @@ docker run -p 5000:5000 \
 
 ### Uso con Docker Compose (Desarrollo Opcional)
 
-### Uso con Docker Compose (Desarrollo Opcional)
-
 **Importante:** Si prefieres usar Docker, sigue estas instrucciones. De lo contrario, usa el [desarrollo local](#desarrollo-local-sin-docker).
 
 #### Primera Vez - Paso a Paso
@@ -460,8 +458,6 @@ alembic downgrade -1
 # Revertir a versión específica
 alembic downgrade <revision_id>
 ```
-
-### Con Docker (Opcional)
 
 ### Con Docker (Opcional)
 

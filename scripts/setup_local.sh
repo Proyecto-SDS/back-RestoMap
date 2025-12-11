@@ -84,7 +84,9 @@ echo ""
 
 # Instalar dependencias
 echo "Paso 5: Instalando dependencias..."
+echo "Actualizando pip..."
 pip install --upgrade pip > /dev/null 2>&1
+echo "Instalando paquetes de requirements.txt (esto puede tardar un momento)..."
 pip install -r requirements.txt
 success "Dependencias instaladas"
 echo ""
@@ -109,7 +111,7 @@ echo "Próximos pasos:"
 echo ""
 echo "1. Asegúrate de que PostgreSQL esté corriendo:"
 echo "   Linux: sudo systemctl status postgresql"
-echo "   macOS: brew services list"
+echo "   macOS: brew services list | grep postgresql"
 echo ""
 echo "2. Crea la base de datos (si no existe):"
 echo "   sudo -u postgres psql"
