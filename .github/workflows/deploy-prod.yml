@@ -4,11 +4,6 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Rama a desplegar'
-        required: true
-        default: 'main'
 
 env:
   PROJECT_ID: 'restomap-478918'
